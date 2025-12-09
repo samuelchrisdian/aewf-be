@@ -1,0 +1,11 @@
+flask
+sqlalchemy
+psycopg2-binary
+pandas
+numpy
+scikit-learn
+imbalanced-learn
+python-dotenv
+openpyxl
+pytest
+requests
