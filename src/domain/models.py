@@ -127,9 +127,15 @@ class AttendanceDaily(db.Model):
 
     id = Column(Integer, primary_key=True, index=True)
     student_nis = Column(String, ForeignKey("students.nis"), nullable=False, index=True)
-    attendance_date = Column(Date, nullable=False)
-    check_in = Column(DateTime, nullable=True) # Time or DateTime? keeping DateTime for easier parsing
+    attendance_date = Column(Date, nullable=False, index=True)
+    check_in = Column(DateTime, nullable=True)
     check_out = Column(DateTime, nullable=True)
-    status = Column(String, nullable=False) # e.g., Present, Absent, Late
+    status = Column(String, nullable=False)  # Present, Absent, Late, Sick, Permission
+    notes = Column(String, nullable=True)  # Notes/reason for manual entries
+    recorded_by = Column(String, ForeignKey("teachers.teacher_id"), nullable=True)  # Who recorded manually
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, onupdate=datetime.datetime.utcnow)
     
+    # Relationships
     student = relationship("Student", back_populates="attendance_daily")
+    recorder = relationship("Teacher", foreign_keys=[recorded_by])
