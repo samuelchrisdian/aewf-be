@@ -10,55 +10,6 @@ logger = logging.getLogger(__name__)
 def get_db_session():
     return db.session
 
-def clean_and_import_attendance(file_path: str):
-    """
-    Reads raw attendance CSV, cleans it, and imports to PostgreSQL.
-    Expected columns: 'nis', 'date', 'status'
-    """
-    session = get_db_session()
-    try:
-        df = pd.read_csv(file_path)
-        
-        # Basic validation
-        required_columns = {'nis', 'date', 'status'}
-        if not required_columns.issubset(df.columns):
-            raise ValueError(f"CSV missing required columns: {required_columns - set(df.columns)}")
-        
-        # Convert date column
-        df['date'] = pd.to_datetime(df['date']).dt.date
-        
-        # Check against existing students
-        existing_nis = {s.nis for s in session.query(Student.nis).all()}
-        
-        valid_records = []
-        for _, row in df.iterrows():
-            str_nis = str(row['nis'])
-            if str_nis in existing_nis:
-                # Check for duplicate record
-                exists = session.query(AttendanceRecord).filter_by(
-                    student_nis=str_nis, 
-                    date=row['date']
-                ).first()
-                
-                if not exists:
-                    record = AttendanceRecord(
-                        student_nis=str_nis,
-                        date=row['date'],
-                        status=row['status']
-                    )
-                    session.add(record)
-                    valid_records.append(record)
-        
-        session.commit()
-        logger.info(f"Imported {len(valid_records)} attendance records.")
-        return len(valid_records)
-
-    except Exception as e:
-        session.rollback()
-        logger.error(f"Error importing attendance: {e}")
-        raise
-    # session lifecycle handled by Flask
-
 def engineer_features():
     """
     Fetches attendance records from DB and computes features for ML.
@@ -67,7 +18,7 @@ def engineer_features():
     session = get_db_session()
     try:
         # Fetch all records
-        records = session.query(AttendanceRecord).all()
+        records = session.query(AttendanceDaily).all()
         if not records:
             return pd.DataFrame()
             

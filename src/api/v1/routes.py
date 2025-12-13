@@ -4,6 +4,7 @@ from src.services.master_data_service import MasterDataService
 from src.services.machine_service import MachineService
 from src.services.ingestion_service import IngestionService
 from src.services.mapping_service import MappingService
+from src.services.ml_service import MLService
 import os
 import uuid
 
@@ -113,5 +114,25 @@ def verify_mapping(current_user):
              return jsonify({'success': True}), 200
         else:
              return jsonify({'success': False, 'message': 'Mapping not found'}), 404
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# --- ML Endpoints ---
+
+@api_v1.route('/models/train', methods=['POST'])
+@token_required
+def train_models(current_user):
+    try:
+        result = MLService.train_models()
+        return jsonify(result), 200
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@api_v1.route('/risk/<nis>', methods=['GET'])
+@token_required
+def get_risk_score(current_user, nis):
+    try:
+        result = MLService.predict_risk(nis)
+        return jsonify({'success': True, 'data': result}), 200
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500

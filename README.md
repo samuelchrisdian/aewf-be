@@ -206,9 +206,40 @@ All endpoints are prefixed with `/api/v1` and require authentication token (Head
 | `GET` | `/mapping/suggestions` | Get list of mapping suggestions requiring manual verification. |
 | `POST` | `/mapping/verify` | Verify or reject a mapping suggestion. Body: `{"mapping_id": 1, "status": "verified"}` |
 
+### Machine Learning & EWS
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/models/train` | Trigger retraining of ML models (Logistic Regression & Decision Tree). |
+| `GET` | `/risk/<nis>` | Get current risk assessment for a specific student. |
+
 ## 🧪 Testing
 
 To run the test suite:
 ```bash
 pytest
 ```
+
+---
+
+## 🧠 Machine Learning Architecture
+
+This project implements a novel **Early Warning System (EWS)** using Machine Learning to predict student drop-out risks based on attendance patterns.
+
+### 1. Feature Engineering
+The system automatically extracts features from raw daily attendance logs:
+- **Attendance Ratio**: Percentage of days present vs. total school days.
+- **Lateness Frequency**: Count of 'Late' check-ins.
+- **Absence Patterns**: Consecutive absenteeism count.
+- **Permission/Sick Rates**: Normalized counts of excused absences.
+
+### 2. Model Pipeline
+- **Algorithms**: 
+  - **Logistic Regression**: For probability estimation of risk.
+  - **Decision Tree Classifier**: For interpretable rule-based risk classification.
+- **Handling Imbalance**: Uses **SMOTE (Synthetic Minority Over-sampling Technique)** to handle the dataset imbalance (since "At-Risk" students are the minority class).
+- **Training**: Models are retrained via the `/api/v1/models/train` endpoint and serialized (`.pkl`) for inference.
+
+### 3. Risk Scoring (Planned)
+- The system will output a **Risk Score (0.0 - 1.0)**.
+- **High Risk (> 0.7)**: Triggers immediate alerts to Homeroom Teachers.
+- **Medium Risk (0.4 - 0.7)**: Flags for observation.
