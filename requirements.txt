@@ -16,3 +16,6 @@ pyjwt>=2.8.0
 thefuzz>=0.20.0
 python-Levenshtein>=0.21.0
 factory_boy>=3.3.0
+marshmallow>=3.19.0
+flask-marshmallow>=0.15.0
+marshmallow-sqlalchemy>=0.29.0
