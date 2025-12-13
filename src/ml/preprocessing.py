@@ -1,6 +1,6 @@
 import pandas as pd
 from sqlalchemy.orm import Session
-from src.domain.models import AttendanceRecord, Student
+from src.domain.models import AttendanceDaily, Student
 from src.app.extensions import db
 import logging
 

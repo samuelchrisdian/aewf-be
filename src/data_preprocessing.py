@@ -1,6 +1,6 @@
 import pandas as pd
 from sqlalchemy.orm import Session
-from src.domain.models import AttendanceRecord, Student
+from src.domain.models import AttendanceDaily, Student, Class
 from src.app.extensions import db
 import logging
 
@@ -35,13 +35,13 @@ def clean_and_import_attendance(file_path: str):
             str_nis = str(row['nis'])
             if str_nis in existing_nis:
                 # Check for duplicate record
-                exists = session.query(AttendanceRecord).filter_by(
+                exists = session.query(AttendanceDaily).filter_by(
                     student_nis=str_nis, 
                     date=row['date']
                 ).first()
                 
                 if not exists:
-                    record = AttendanceRecord(
+                    record = AttendanceDaily(
                         student_nis=str_nis,
                         date=row['date'],
                         status=row['status']
@@ -68,7 +68,7 @@ def engineer_features():
     session = get_db_session()
     try:
         # Fetch all records
-        records = session.query(AttendanceRecord).all()
+        records = session.query(AttendanceDaily).all()
         if not records:
             return pd.DataFrame()
             

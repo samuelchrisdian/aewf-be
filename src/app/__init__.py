@@ -19,8 +19,8 @@ def create_app(config_name=None):
     register_error_handlers(app)
 
     # Register blueprints
-    from src.api.v1 import v1_bp
-    app.register_blueprint(v1_bp, url_prefix='/api/v1')
+    from src.api.v1.routes import api_v1
+    app.register_blueprint(api_v1)
 
     # Health check
     @app.route('/health')

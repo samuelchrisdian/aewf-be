@@ -7,7 +7,11 @@ scikit-learn<1.8
 imbalanced-learn
 python-dotenv
 openpyxl
+xlrd>=2.0.0
 pytest
 requests
 flask-sqlalchemy
 flask-migrate
+pyjwt>=2.8.0
+thefuzz>=0.20.0
+python-Levenshtein>=0.21.0
