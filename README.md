@@ -120,7 +120,9 @@ be-flask/
 | `attendance_date` | Date | Not Null | Date of attendance |
 | `check_in` | DateTime | Nullable | First Check-in Time |
 | `check_out` | DateTime | Nullable | Last Check-out Time |
-| `status` | String | Not Null | Final Status (Present, Absent, Late) |
+| `status` | String | Not Null | Final Status (Present, Absent, Late, Sick, Permission) |
+| `notes` | String | Nullable | Manual entry notes |
+| `recorded_by` | String | FK (`teachers.teacher_id`) | Teacher who recorded the entry |
 
 ### `import_batches`
 | Column | Type | Constraints | Description |
@@ -192,6 +194,25 @@ The server will start at `http://localhost:5000`.
 
 All endpoints are prefixed with `/api/v1` and require authentication token (Header: `Authorization: <token>`).
 
+### 🏫 Master Data
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/students` | Get list of students (filter by class, active status, search). |
+| `POST` | `/students` | Create a new student. |
+| `GET` | `/students/<nis>` | Get student details. |
+| `PUT` | `/students/<nis>` | Update student details. |
+| `DELETE` | `/students/<nis>` | Soft delete student. |
+| `GET` | `/teachers` | Get list of teachers. |
+| `POST` | `/teachers` | Create a new teacher. |
+| `GET` | `/teachers/<id>` | Get teacher details. |
+| `PUT` | `/teachers/<id>` | Update teacher details. |
+| `DELETE` | `/teachers/<id>` | Delete teacher (if not assigned to class). |
+| `GET` | `/classes` | Get list of classes. |
+| `POST` | `/classes` | Create a new class. |
+| `GET` | `/classes/<id>` | Get class details. |
+| `PUT` | `/classes/<id>` | Update class details. |
+| `DELETE` | `/classes/<id>` | Delete class (if empty). |
+
 ### 📥 Data Import
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -206,6 +227,15 @@ All endpoints are prefixed with `/api/v1` and require authentication token (Head
 | `GET` | `/mapping/suggestions` | Get list of mapping suggestions requiring manual verification. |
 | `POST` | `/mapping/verify` | Verify or reject a mapping suggestion. Body: `{"mapping_id": 1, "status": "verified"}` |
 
+### 📅 Attendance Management
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/attendance/daily` | Get daily attendance list with filters (date, class, status). |
+| `GET` | `/attendance/student/<nis>` | Get attendance history for a specific student. |
+| `POST` | `/attendance/manual` | Create a manual attendance entry. Body: `{"student_nis": "...", "status": "Sick", ...}` |
+| `PUT` | `/attendance/<id>` | Update an attendance record. |
+| `GET` | `/attendance/summary` | Get aggregated attendance summary/analytics. |
+
 ### Machine Learning & EWS
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -217,6 +247,11 @@ All endpoints are prefixed with `/api/v1` and require authentication token (Head
 To run the test suite:
 ```bash
 pytest
+```
+
+To run with verbose output:
+```bash
+pytest -v
 ```
 
 ---
