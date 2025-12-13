@@ -3,9 +3,11 @@ sqlalchemy
 psycopg2-binary
 pandas
 numpy
-scikit-learn
+scikit-learn<1.8
 imbalanced-learn
 python-dotenv
 openpyxl
 pytest
 requests
+flask-sqlalchemy
+flask-migrate

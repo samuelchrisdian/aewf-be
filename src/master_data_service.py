@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
-from src.models import Student, Class, Teacher
-from src.db_config import SessionLocal
+from src.domain.models import Student, Class, Teacher
+from src.app.extensions import db
 import pandas as pd
 import logging
 
@@ -8,7 +8,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def get_db_session():
-    return SessionLocal()
+    return db.session
 
 def import_master_data(file_path: str):
     """

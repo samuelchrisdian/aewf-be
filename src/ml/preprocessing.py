@@ -57,8 +57,7 @@ def clean_and_import_attendance(file_path: str):
         session.rollback()
         logger.error(f"Error importing attendance: {e}")
         raise
-    finally:
-        session.close()
+    # session lifecycle handled by Flask
 
 def engineer_features():
     """
@@ -97,5 +96,4 @@ def engineer_features():
     except Exception as e:
         logger.error(f"Error engineering features: {e}")
         return pd.DataFrame()
-    finally:
-        session.close()
+    # session lifecycle handled by Flask
