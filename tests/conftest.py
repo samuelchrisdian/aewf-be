@@ -1,12 +1,19 @@
 import pytest
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from app import app
 from src.db_config import Base, engine, SessionLocal
 
 @pytest.fixture(scope="session")
 def test_client():
     app.config["TESTING"] = True
-    # In a real scenario, use a separate test DB
-    # app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:" 
+    # Ensure tests use the same database as the application (Postgres)
+    # This matches the behavior of SessionLocal used in repositories
+    import os
+    if os.environ.get("DATABASE_URL"):
+        app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL")
     
     with app.test_client() as client:
         yield client

@@ -16,8 +16,9 @@ Backend service for the **Attendance Early Warning Framework (AEWF)** system. Bu
   - Import raw attendance logs from multiple machine types.
   - Automatic cleaning and processing of daily attendance.
 - **Early Warning System (EWS)**:
-  - Real-time risk assessment engine (Planned).
-  - Hybrid rule-based and ML-based risk scoring (Planned).
+  - Real-time risk assessment engine.
+  - Hybrid rule-based and ML-based risk scoring.
+  - Automated alert generation (`risk_alerts`) and history tracking (`risk_history`).
 - **Architecture**:
   - Modular Flask Blueprint design.
   - SQLAlchemy ORM with PostgreSQL.
@@ -134,6 +135,28 @@ be-flask/
 | `status` | String | Nullable | Processing Status |
 | `records_processed`| Integer | Nullable | Number of records handled |
 | `error_log` | JSON | Nullable | Log of processing errors |
+
+### `risk_alerts`
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | Integer | PK, Index | Unique Alert ID |
+| `student_nis` | String | FK (`students.nis`) | Student ID |
+| `alert_type` | String | Not Null | Type (High Risk, etc) |
+| `message` | String | Not Null | Alert Message |
+| `status` | String | Default: pending | Status (pending, acknowledged, resolved) |
+| `assigned_to` | String | FK (`teachers.teacher_id`) | Teacher assigned |
+| `action_taken` | String | Nullable | Action taken |
+| `follow_up_date`| Date | Nullable | Scheduled follow-up |
+
+### `risk_history`
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | Integer | PK | Unique ID |
+| `student_nis` | String | FK (`students.nis`) | Student ID |
+| `risk_level` | String | Not Null | Risk Level (High, Medium, Low) |
+| `risk_score` | Integer | Not Null | Score (0-100) |
+| `factors` | JSON | Nullable | Contributing factors |
+| `calculated_at`| DateTime | Not Null | Calculation time |
 
 ## 🚀 Installation & Setup
 
@@ -260,11 +283,22 @@ All endpoints are prefixed with `/api/v1` and require authentication token (Head
 | `GET` | `/analytics/class-comparison` | Get class-by-class attendance comparison. Query: `?period=YYYY-MM` |
 | `GET` | `/analytics/student-patterns/<nis>` | Get individual student attendance patterns (summary, trend, weekly patterns). |
 
-### Machine Learning & EWS
+### 🚨 Risk Management
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `POST` | `/models/train` | Trigger retraining of ML models (Logistic Regression & Decision Tree). |
-| `GET` | `/risk/<nis>` | Get current risk assessment for a specific student. |
+| `GET` | `/risk/list` | List at-risk students (filter by level, class). |
+| `GET` | `/risk/<nis>` | Get detailed risk profile for a student. |
+| `GET` | `/risk/alerts` | Get risk alerts (filter by status). |
+| `POST` | `/risk/alerts/<id>/action` | Take action on an alert (update status). |
+| `GET` | `/risk/history/<nis>` | Get historical risk scores. |
+| `POST` | `/risk/recalculate` | Trigger batch risk recalculation. |
+
+### 🤖 ML Model Management
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/models/info` | Get installed ML models info. |
+| `GET` | `/models/performance` | Get recent model performance metrics. |
+| `POST` | `/models/retrain` | Trigger retraining of ML models. |
 
 ## 🧪 Testing
 
@@ -296,9 +330,10 @@ The system automatically extracts features from raw daily attendance logs:
   - **Logistic Regression**: For probability estimation of risk.
   - **Decision Tree Classifier**: For interpretable rule-based risk classification.
 - **Handling Imbalance**: Uses **SMOTE (Synthetic Minority Over-sampling Technique)** to handle the dataset imbalance (since "At-Risk" students are the minority class).
-- **Training**: Models are retrained via the `/api/v1/models/train` endpoint and serialized (`.pkl`) for inference.
+- **Training**: Models are retrained via the `/api/v1/models/retrain` endpoint and serialized (`.pkl`) for inference.
 
-### 3. Risk Scoring (Planned)
-- The system will output a **Risk Score (0.0 - 1.0)**.
-- **High Risk (> 0.7)**: Triggers immediate alerts to Homeroom Teachers.
-- **Medium Risk (0.4 - 0.7)**: Flags for observation.
+### 3. Risk Scoring
+- The system outputs a **Risk Score (0-100)** and Level (High, Medium, Low).
+- **High Risk**: Triggers immediate alerts (`risk_alerts`) to Homeroom Teachers.
+- **Medium Risk**: Flags for observation.
+- **History**: Calculation history is preserved in `risk_history` for trend analysis.

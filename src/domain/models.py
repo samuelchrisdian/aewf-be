@@ -141,3 +141,39 @@ class AttendanceDaily(db.Model):
     # Relationships
     student = relationship("Student", back_populates="attendance_daily")
     recorder = relationship("Teacher", foreign_keys=[recorded_by])
+
+# --- Risk Management (EWS) ---
+class RiskAlert(db.Model):
+    """Alerts generated for at-risk students."""
+    __tablename__ = "risk_alerts"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    student_nis = Column(String, ForeignKey("students.nis"), nullable=False, index=True)
+    alert_type = Column(String, nullable=False)  # 'high_risk', 'medium_risk', 'consecutive_absence'
+    message = Column(String, nullable=False)
+    status = Column(String, default='pending')  # 'pending', 'acknowledged', 'resolved'
+    assigned_to = Column(String, ForeignKey("teachers.teacher_id"), nullable=True)
+    action_taken = Column(String, nullable=True)  # 'contacted_parent', 'scheduled_meeting', etc.
+    action_notes = Column(String, nullable=True)
+    follow_up_date = Column(Date, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    resolved_at = Column(DateTime, nullable=True)
+    
+    # Relationships
+    student = relationship("Student", backref="alerts")
+    assignee = relationship("Teacher", foreign_keys=[assigned_to])
+
+
+class RiskHistory(db.Model):
+    """Historical risk scores for students."""
+    __tablename__ = "risk_history"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    student_nis = Column(String, ForeignKey("students.nis"), nullable=False, index=True)
+    risk_level = Column(String, nullable=False)  # 'high', 'medium', 'low'
+    risk_score = Column(Integer, nullable=False)  # 0-100
+    factors = Column(JSON, nullable=True)  # Stores factors like attendance_rate, consecutive_absences, etc.
+    calculated_at = Column(DateTime, default=datetime.datetime.utcnow)
+    
+    # Relationships
+    student = relationship("Student", backref="risk_history")
