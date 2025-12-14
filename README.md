@@ -19,6 +19,10 @@ Backend service for the **Attendance Early Warning Framework (AEWF)** system. Bu
   - Real-time risk assessment engine.
   - Hybrid rule-based and ML-based risk scoring.
   - Automated alert generation (`risk_alerts`) and history tracking (`risk_history`).
+- **Notifications System**:
+  - In-app notification center for teachers and parents.
+  - Multi-channel support (In-App, Email, SMS).
+  - User-configurable notification settings per teacher.
 - **Architecture**:
   - Modular Flask Blueprint design.
   - SQLAlchemy ORM with PostgreSQL.
@@ -157,6 +161,27 @@ be-flask/
 | `risk_score` | Integer | Not Null | Score (0-100) |
 | `factors` | JSON | Nullable | Contributing factors |
 | `calculated_at`| DateTime | Not Null | Calculation time |
+
+### `notifications`
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | Integer | PK, Index | Unique Notification ID |
+| `recipient_type` | String | Not Null | 'teacher' or 'parent' |
+| `recipient_id` | String | Index | Teacher ID or Parent Phone |
+| `type` | String | Not Null | Type (risk_alert, attendance, etc) |
+| `title` | String | Not Null | Title |
+| `message` | String | Not Null | Body content |
+| `priority` | String | Default: normal | High, Normal, Low |
+| `is_read` | Boolean | Default: False | Read status |
+
+### `notification_settings`
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | Integer | PK, Index | Unique Settings ID |
+| `user_id` | Integer | FK (`users.id`), Unique | User/Teacher ID |
+| `enable_risk_alerts`| Boolean | Default: True | Toggle risk alerts |
+| `enable_attendance` | Boolean | Default: True | Toggle attendance alerts |
+| `daily_digest_time` | String | Default: 07:00 | Preferred digest time |
 
 ## 🚀 Installation & Setup
 
@@ -309,6 +334,16 @@ All endpoints are prefixed with `/api/v1` and require authentication token (Head
 | `GET` | `/export/students` | Export students to Excel file. Query: `?class_id=` (optional) |
 | `GET` | `/export/attendance` | Export attendance records to Excel. Query: `?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD&class_id=` (optional) |
 | `GET` | `/export/template/master` | Download master data import template (Excel with Students, Classes, Teachers sheets). |
+
+### 🔔 Notifications
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/notifications` | List notifications. Query: `?is_read=true\|false`, `?page=1` |
+| `POST` | `/notifications/send` | Send a new notification content. |
+| `PUT` | `/notifications/<id>/read` | Mark a notification as read. |
+| `DELETE` | `/notifications/<id>` | Delete a notification. |
+| `GET` | `/notifications/settings` | Get user notification preferences. |
+| `PUT` | `/notifications/settings` | Update notification preferences. |
 
 ## 🧪 Testing
 

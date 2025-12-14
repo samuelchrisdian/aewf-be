@@ -605,3 +605,83 @@ Follow this order to ensure foreign key dependencies are met.
     - **Students sheet**: nis, name, class_id, parent_phone (with example row)
     - **Classes sheet**: class_id, class_name, wali_kelas_id (with example row)
     - **Teachers sheet**: teacher_id, name, phone, role (with example row)
+
+---
+
+## 11. 🔔 Notifications
+
+### 11.1 List Notifications
+*   **Endpoint**: `GET /notifications`
+*   **Response**:
+    ```json
+    {
+        "status": "success",
+        "data": {
+            "unread_count": 1,
+            "notifications": [
+                {
+                    "id": 1,
+                    "type": "risk_alert",
+                    "title": "High Risk Alert",
+                    "message": "Student John Doe is at high risk due to attendance.",
+                    "priority": "high",
+                    "is_read": false,
+                    "created_at": "2024-12-14T10:00:00"
+                }
+            ]
+        },
+        "pagination": { ... }
+    }
+    ```
+
+### 11.2 Send Notification
+*   **Endpoint**: `POST /notifications/send`
+*   **Request Body**:
+    ```json
+    {
+        "recipient_type": "teacher",
+        "recipient_id": "T-001",
+        "title": "Meeting Reminder",
+        "message": "Please attend the staff meeting at 3 PM.",
+        "priority": "normal"
+    }
+    ```
+*   **Response**: `201 Created` with notification details.
+
+### 11.3 Mark as Read
+*   **Endpoint**: `PUT /notifications/1/read`
+*   **Response**:
+    ```json
+    {
+        "status": "success",
+        "message": "Notification marked as read"
+    }
+    ```
+
+### 11.4 Get Notification Settings
+*   **Endpoint**: `GET /notifications/settings`
+*   **Response**:
+    ```json
+    {
+        "status": "success",
+        "data": {
+            "user_id": 1,
+            "enable_risk_alerts": true,
+            "enable_attendance": true,
+            "enable_email": true,
+            "enable_sms": false,
+            "daily_digest_time": "07:00"
+        }
+    }
+    ```
+
+### 11.5 Update Notification Settings
+*   **Endpoint**: `PUT /notifications/settings`
+*   **Request Body**:
+    ```json
+    {
+        "enable_sms": true,
+        "daily_digest_time": "08:00"
+    }
+    ```
+*   **Response**: `200 OK` with updated settings.

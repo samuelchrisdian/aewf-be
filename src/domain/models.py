@@ -177,3 +177,38 @@ class RiskHistory(db.Model):
     
     # Relationships
     student = relationship("Student", backref="risk_history")
+
+
+# --- Notifications Domain ---
+class Notification(db.Model):
+    """In-app notifications for teachers and parents."""
+    __tablename__ = "notifications"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    recipient_type = Column(String, nullable=False)  # 'teacher' or 'parent'
+    recipient_id = Column(String, nullable=False, index=True)  # teacher_id or parent phone
+    type = Column(String, nullable=False)  # 'risk_alert', 'attendance', 'custom'
+    title = Column(String, nullable=False)
+    message = Column(String, nullable=False)
+    priority = Column(String, default='normal')  # 'high', 'normal', 'low'
+    channel = Column(String, default='in_app')  # 'in_app', 'email', 'sms'
+    is_read = Column(Boolean, default=False)
+    action_url = Column(String, nullable=True)  # Optional deep link
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    read_at = Column(DateTime, nullable=True)
+
+
+class NotificationSettings(db.Model):
+    """User notification preferences."""
+    __tablename__ = "notification_settings"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
+    enable_risk_alerts = Column(Boolean, default=True)
+    enable_attendance = Column(Boolean, default=True)
+    enable_email = Column(Boolean, default=True)
+    enable_sms = Column(Boolean, default=False)
+    daily_digest_time = Column(String, default='07:00')  # HH:MM format
+    
+    # Relationships
+    user = relationship("User", backref="notification_settings")

@@ -102,6 +102,7 @@ The following integration test files cover API endpoints:
 *   **`test_models_api.py`**: ML model management
 *   **`test_reports_api.py`**: Report generation (Phase 6)
 *   **`test_export_api.py`**: Data export to Excel (Phase 6)
+*   **`test_notifications_api.py`**: Notification system endpoints (Phase 7)
 
 ### Running Specific Test Suites
 
