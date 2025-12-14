@@ -26,6 +26,8 @@ def create_app(config_name=None):
     from src.api.v1.attendance import attendance_bp
     from src.api.v1.machines import machines_bp
     from src.api.v1.mapping import mapping_bp
+    from src.api.v1.dashboard import dashboard_bp
+    from src.api.v1.analytics import analytics_bp
     
     app.register_blueprint(api_v1)
     app.register_blueprint(students_bp)
@@ -34,6 +36,8 @@ def create_app(config_name=None):
     app.register_blueprint(attendance_bp)
     app.register_blueprint(machines_bp)
     app.register_blueprint(mapping_bp)
+    app.register_blueprint(dashboard_bp)
+    app.register_blueprint(analytics_bp)
 
     # Health check
     @app.route('/health')

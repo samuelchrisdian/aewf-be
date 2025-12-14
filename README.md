@@ -252,6 +252,14 @@ All endpoints are prefixed with `/api/v1` and require authentication token (Head
 | `PUT` | `/attendance/<id>` | Update an attendance record. |
 | `GET` | `/attendance/summary` | Get aggregated attendance summary/analytics. |
 
+### 📊 Dashboard & Analytics
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/dashboard/stats` | Get complete dashboard statistics (overview, today's attendance, monthly stats, risk summary). |
+| `GET` | `/analytics/trends` | Get attendance trend data for charts. Query: `?period=weekly\|monthly&start_date=&end_date=` |
+| `GET` | `/analytics/class-comparison` | Get class-by-class attendance comparison. Query: `?period=YYYY-MM` |
+| `GET` | `/analytics/student-patterns/<nis>` | Get individual student attendance patterns (summary, trend, weekly patterns). |
+
 ### Machine Learning & EWS
 | Method | Endpoint | Description |
 |--------|----------|-------------|
