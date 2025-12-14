@@ -105,6 +105,8 @@ The following integration test files cover API endpoints:
 *   **`test_notifications_api.py`**: Notification system endpoints (Phase 7)
 *   **`test_auth_api.py`**: Authentication endpoints (Phase 8)
 *   **`test_users_api.py`**: User management endpoints (Phase 8)
+*   **`test_config_api.py`**: System configuration endpoints (Phase 9)
+*   **`test_batch_api.py`**: Import batch management endpoints (Phase 9)
 
 ### Running Specific Test Suites
 
@@ -121,6 +123,11 @@ pytest tests/integration/test_reports_api.py tests/integration/test_export_api.p
 **Run Phase 8 tests only:**
 ```bash
 pytest tests/integration/test_auth_api.py tests/integration/test_users_api.py -v
+```
+
+**Run Phase 9 tests only:**
+```bash
+pytest tests/integration/test_config_api.py tests/integration/test_batch_api.py -v
 ```
 
 **Run with coverage report:**

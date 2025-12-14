@@ -966,3 +966,212 @@ Follow this order to ensure foreign key dependencies are met.
         }
     }
     ```
+
+---
+
+## 14. ⚙️ System Configuration (Admin Only)
+
+### 14.1 Get System Settings
+*   **Endpoint**: `GET /config/settings`
+*   **Headers**: `Authorization: Bearer <admin_token>`
+*   **Response**:
+    ```json
+    {
+        "success": true,
+        "message": "Settings retrieved successfully",
+        "data": {
+            "attendance_rules": {
+                "late_threshold_minutes": 15,
+                "grace_period_minutes": 5,
+                "auto_absent_after_hours": 4,
+                "school_start_time": "07:00",
+                "school_end_time": "15:00"
+            },
+            "risk_thresholds": {
+                "high_risk_score": 70,
+                "medium_risk_score": 40,
+                "consecutive_absence_alert": 3
+            },
+            "notification_settings": {
+                "enable_sms": false,
+                "enable_email": true,
+                "daily_digest_time": "07:00"
+            }
+        }
+    }
+    ```
+
+### 14.2 Update System Settings
+*   **Endpoint**: `PUT /config/settings`
+*   **Headers**: `Authorization: Bearer <admin_token>`
+*   **Request Body**:
+    ```json
+    {
+        "attendance_rules": {
+            "late_threshold_minutes": 20,
+            "school_start_time": "07:30"
+        },
+        "risk_thresholds": {
+            "consecutive_absence_alert": 5
+        }
+    }
+    ```
+*   **Response**:
+    ```json
+    {
+        "success": true,
+        "message": "Settings updated successfully",
+        "data": { ... updated settings ... }
+    }
+    ```
+
+### 14.3 Get School Calendar
+*   **Endpoint**: `GET /config/school-calendar`
+*   **Headers**: `Authorization: Bearer <token>`
+*   **Query**: `?year=2024`
+*   **Response**:
+    ```json
+    {
+        "success": true,
+        "message": "School calendar retrieved successfully",
+        "data": {
+            "year": 2024,
+            "month": null,
+            "holidays": [
+                {
+                    "id": 1,
+                    "date": "2024-12-25",
+                    "name": "Christmas Day",
+                    "type": "holiday"
+                }
+            ],
+            "total_holidays": 1,
+            "school_settings": {
+                "start_time": "07:00",
+                "end_time": "15:00",
+                "late_threshold_minutes": 15
+            }
+        }
+    }
+    ```
+
+### 14.4 Add Holiday
+*   **Endpoint**: `POST /config/holidays`
+*   **Headers**: `Authorization: Bearer <admin_token>`
+*   **Request Body**:
+    ```json
+    {
+        "date": "2024-12-25",
+        "name": "Christmas Day",
+        "type": "holiday"
+    }
+    ```
+*   **Response**:
+    ```json
+    {
+        "success": true,
+        "message": "Holiday added successfully",
+        "data": {
+            "id": 1,
+            "date": "2024-12-25",
+            "name": "Christmas Day",
+            "type": "holiday",
+            "created_at": "2024-12-14T10:00:00"
+        }
+    }
+    ```
+
+### 14.5 Delete Holiday
+*   **Endpoint**: `DELETE /config/holidays/1`
+*   **Headers**: `Authorization: Bearer <admin_token>`
+*   **Response**:
+    ```json
+    {
+        "success": true,
+        "message": "Holiday deleted successfully"
+    }
+    ```
+
+---
+
+## 15. 📦 Import Batch Management
+
+### 15.1 List Import Batches
+*   **Endpoint**: `GET /import/batches`
+*   **Headers**: `Authorization: Bearer <token>`
+*   **Query**: `?file_type=logs&status=completed`
+*   **Response**:
+    ```json
+    {
+        "success": true,
+        "message": "Batches retrieved successfully",
+        "data": [
+            {
+                "id": 1,
+                "filename": "attendance_log.xlsx",
+                "file_type": "logs",
+                "status": "completed",
+                "records_processed": 150,
+                "created_at": "2024-12-14T09:00:00",
+                "has_errors": false
+            }
+        ],
+        "pagination": {
+            "page": 1,
+            "per_page": 20,
+            "total": 1,
+            "pages": 1
+        }
+    }
+    ```
+
+### 15.2 Get Batch Details
+*   **Endpoint**: `GET /import/batches/1`
+*   **Headers**: `Authorization: Bearer <token>`
+*   **Response**:
+    ```json
+    {
+        "success": true,
+        "message": "Batch retrieved successfully",
+        "data": {
+            "id": 1,
+            "filename": "attendance_log.xlsx",
+            "file_type": "logs",
+            "status": "completed",
+            "records_processed": 150,
+            "raw_logs_count": 150,
+            "created_at": "2024-12-14T09:00:00",
+            "error_log": null
+        }
+    }
+    ```
+
+### 15.3 Rollback Batch (Admin Only)
+**Scenario**: Rollback an import that contained bad data.
+
+*   **Endpoint**: `POST /import/batches/1/rollback`
+*   **Headers**: `Authorization: Bearer <admin_token>`
+*   **Response**:
+    ```json
+    {
+        "success": true,
+        "message": "Batch rolled back successfully",
+        "data": {
+            "deleted_raw_logs": 150
+        }
+    }
+    ```
+
+### 15.4 Delete Batch (Admin Only)
+*   **Endpoint**: `DELETE /import/batches/1`
+*   **Headers**: `Authorization: Bearer <admin_token>`
+*   **Response**:
+    ```json
+    {
+        "success": true,
+        "message": "Batch deleted successfully",
+        "data": {
+            "deleted_raw_logs": 150
+        }
+    }
+    ```

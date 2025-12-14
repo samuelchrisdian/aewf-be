@@ -28,6 +28,11 @@ Backend service for the **Attendance Early Warning Framework (AEWF)** system. Bu
   - Role-based access control (Admin, Teacher, Staff).
   - Password hashing with bcrypt.
   - Activity logging for audit trails.
+- **System Configuration**:
+  - Configurable attendance rules (late threshold, grace period, school hours).
+  - Risk assessment thresholds and notification settings.
+  - School calendar and holiday management.
+  - Import batch management with rollback support.
 - **Architecture**:
   - Modular Flask Blueprint design.
   - SQLAlchemy ORM with PostgreSQL.
@@ -205,6 +210,26 @@ be-flask/
 | `enable_risk_alerts`| Boolean | Default: True | Toggle risk alerts |
 | `enable_attendance` | Boolean | Default: True | Toggle attendance alerts |
 | `daily_digest_time` | String | Default: 07:00 | Preferred digest time |
+
+### `system_config` (Settings)
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `key` | String | PK | Setting key name |
+| `value` | JSON | Not Null | Setting value (JSON) |
+| `category` | String | Not Null, Index | Category (attendance, risk, notification) |
+| `description` | String | Nullable | Setting description |
+| `updated_at` | DateTime | Nullable | Last update timestamp |
+| `updated_by` | Integer | FK (`users.id`) | User who updated |
+
+### `school_holidays`
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | Integer | PK, Index | Unique Holiday ID |
+| `date` | Date | Unique, Index | Holiday date |
+| `name` | String | Not Null | Holiday name |
+| `type` | String | Default: holiday | Type (holiday, break, event) |
+| `created_at` | DateTime | Default: now | Creation timestamp |
+| `created_by` | Integer | FK (`users.id`) | User who created |
 
 ## 🚀 Installation & Setup
 
@@ -386,6 +411,23 @@ All endpoints are prefixed with `/api/v1` and require authentication token (Head
 | `PUT` | `/users/<id>` | Update user details. |
 | `DELETE` | `/users/<id>` | Soft delete user (sets is_active=false). |
 | `GET` | `/users/<id>/activity-log` | Get user activity log. Query: `?action=login\|logout\|password_change` |
+
+### ⚙️ System Configuration (Admin Only)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/config/settings` | Get all system settings (attendance rules, risk thresholds, notification settings). |
+| `PUT` | `/config/settings` | Update system settings. Body: `{"attendance_rules": {...}, "risk_thresholds": {...}}` |
+| `GET` | `/config/school-calendar` | Get school calendar with holidays. Query: `?year=2024` |
+| `POST` | `/config/holidays` | Add a school holiday. Body: `{"date": "YYYY-MM-DD", "name": "...", "type": "holiday\|break\|event"}` |
+| `DELETE` | `/config/holidays/<id>` | Remove a school holiday. |
+
+### 📦 Import Batch Management
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/import/batches` | List import batches. Query: `?file_type=logs\|master\|users`, `?status=completed\|failed` |
+| `GET` | `/import/batches/<id>` | Get batch details with error logs. |
+| `DELETE` | `/import/batches/<id>` | Delete batch and raw logs. (Admin only) |
+| `POST` | `/import/batches/<id>/rollback` | Rollback batch - delete raw logs. (Admin only) |
 
 ## 🧪 Testing
 

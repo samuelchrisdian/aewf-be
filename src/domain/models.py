@@ -245,3 +245,34 @@ class NotificationSettings(db.Model):
     
     # Relationships
     user = relationship("User", backref="notification_settings")
+
+
+# --- System Configuration ---
+class SystemConfig(db.Model):
+    """System-wide configuration settings stored as key-value pairs."""
+    __tablename__ = "system_config"
+    
+    key = Column(String, primary_key=True)
+    value = Column(JSON, nullable=False)
+    category = Column(String, nullable=False, index=True)  # 'attendance', 'risk', 'notification'
+    description = Column(String, nullable=True)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    updated_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    
+    # Relationships
+    updater = relationship("User", foreign_keys=[updated_by])
+
+
+class SchoolHoliday(db.Model):
+    """School holidays and non-school days."""
+    __tablename__ = "school_holidays"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    date = Column(Date, nullable=False, unique=True, index=True)
+    name = Column(String, nullable=False)
+    type = Column(String, default='holiday')  # 'holiday', 'break', 'event'
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    
+    # Relationships
+    creator = relationship("User", foreign_keys=[created_by])
