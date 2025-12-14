@@ -82,3 +82,40 @@ def test_create_class(test_client):
 If your tests require authentication:
 1.  Ensure your `conftest.py` configures the app correctly.
 2.  You may need to mock the `token_required` decorator or generate a valid token in the test fixture to pass in headers.
+
+---
+
+## 📊 Test Coverage by Module
+
+### Integration Tests
+The following integration test files cover API endpoints:
+
+*   **`test_students_api.py`**: Student CRUD operations
+*   **`test_teachers_api.py`**: Teacher CRUD operations
+*   **`test_classes_api.py`**: Class CRUD operations
+*   **`test_attendance_api.py`**: Attendance management endpoints
+*   **`test_machines_api.py`**: Machine management endpoints
+*   **`test_mapping_api.py`**: Fuzzy mapping endpoints
+*   **`test_dashboard_api.py`**: Dashboard statistics
+*   **`test_analytics_api.py`**: Analytics and trends
+*   **`test_risk_api.py`**: Risk management and alerts
+*   **`test_models_api.py`**: ML model management
+*   **`test_reports_api.py`**: Report generation (Phase 6)
+*   **`test_export_api.py`**: Data export to Excel (Phase 6)
+
+### Running Specific Test Suites
+
+**Run all integration tests:**
+```bash
+pytest tests/integration/ -v
+```
+
+**Run Phase 6 tests only:**
+```bash
+pytest tests/integration/test_reports_api.py tests/integration/test_export_api.py -v
+```
+
+**Run with coverage report:**
+```bash
+pytest --cov=src --cov-report=html
+```

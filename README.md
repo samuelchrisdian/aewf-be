@@ -300,6 +300,16 @@ All endpoints are prefixed with `/api/v1` and require authentication token (Head
 | `GET` | `/models/performance` | Get recent model performance metrics. |
 | `POST` | `/models/retrain` | Trigger retraining of ML models. |
 
+### 📄 Reports & Export
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/reports/attendance` | Generate attendance report. Query: `?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD&format=json\|excel&class_id=&student_nis=` |
+| `GET` | `/reports/risk` | Generate risk report with at-risk students. Query: `?format=json\|excel&class_id=` |
+| `GET` | `/reports/class-summary` | Generate class summary report. Query: `?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD&format=json\|excel` |
+| `GET` | `/export/students` | Export students to Excel file. Query: `?class_id=` (optional) |
+| `GET` | `/export/attendance` | Export attendance records to Excel. Query: `?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD&class_id=` (optional) |
+| `GET` | `/export/template/master` | Download master data import template (Excel with Students, Classes, Teachers sheets). |
+
 ## 🧪 Testing
 
 To run the test suite:

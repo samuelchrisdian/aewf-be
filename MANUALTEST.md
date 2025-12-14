@@ -459,3 +459,149 @@ Follow this order to ensure foreign key dependencies are met.
         }
     }
     ```
+
+---
+
+## 10. 📄 Reports & Export
+
+### 10.1 Attendance Report (JSON)
+**Scenario**: Generate attendance report for a date range.
+
+*   **Endpoint**: `GET /reports/attendance`
+*   **Query**: `?start_date=2024-01-01&end_date=2024-01-31`
+*   **Response**:
+    ```json
+    {
+        "success": true,
+        "message": "Attendance report generated successfully",
+        "data": {
+            "report_type": "attendance",
+            "period": {
+                "start_date": "2024-01-01",
+                "end_date": "2024-01-31"
+            },
+            "statistics": {
+                "total_school_days": 20,
+                "average_attendance_rate": 94.5,
+                "present_count": 662,
+                "late_count": 28,
+                "absent_count": 10
+            },
+            "daily_breakdown": [
+                {
+                    "date": "2024-01-15",
+                    "present": 33,
+                    "late": 2,
+                    "absent": 0
+                }
+            ]
+        }
+    }
+    ```
+
+### 10.2 Attendance Report (Excel)
+**Scenario**: Download attendance report as Excel file.
+
+*   **Endpoint**: `GET /reports/attendance`
+*   **Query**: `?start_date=2024-01-01&end_date=2024-01-31&format=excel`
+*   **Response**: Excel file download (`attendance_report_2024-01-01_2024-01-31.xlsx`)
+
+### 10.3 Risk Report
+**Scenario**: Generate report of at-risk students.
+
+*   **Endpoint**: `GET /reports/risk`
+*   **Query**: `?class_id=XII-IPA-A` (optional)
+*   **Response**:
+    ```json
+    {
+        "success": true,
+        "message": "Risk report generated successfully",
+        "data": {
+            "report_type": "risk",
+            "summary": {
+                "total_at_risk": 5,
+                "high_risk": 2,
+                "medium_risk": 3,
+                "low_risk": 0
+            },
+            "students": [
+                {
+                    "nis": "2024001",
+                    "name": "John Doe",
+                    "class_id": "XII-IPA-A",
+                    "risk_level": "high",
+                    "risk_score": 85.5,
+                    "factors": {
+                        "attendance_rate": 60.5,
+                        "consecutive_absences": 4
+                    }
+                }
+            ]
+        }
+    }
+    ```
+
+### 10.4 Class Summary Report
+**Scenario**: Generate summary report for all classes.
+
+*   **Endpoint**: `GET /reports/class-summary`
+*   **Query**: `?start_date=2024-01-01&end_date=2024-01-31`
+*   **Response**:
+    ```json
+    {
+        "success": true,
+        "message": "Class summary report generated successfully",
+        "data": {
+            "report_type": "class_summary",
+            "period": {
+                "start_date": "2024-01-01",
+                "end_date": "2024-01-31"
+            },
+            "classes": [
+                {
+                    "class_id": "XII-IPA-A",
+                    "class_name": "Grade 12 Science A",
+                    "wali_kelas": {
+                        "teacher_id": "T-001",
+                        "name": "Sarah Connor"
+                    },
+                    "student_count": 35,
+                    "attendance_statistics": {
+                        "average_attendance_rate": 93.2
+                    },
+                    "at_risk_students": 3
+                }
+            ]
+        }
+    }
+    ```
+
+### 10.5 Export Students to Excel
+**Scenario**: Download all students as Excel file.
+
+*   **Endpoint**: `GET /export/students`
+*   **Query**: `?class_id=XII-IPA-A` (optional filter)
+*   **Response**: Excel file download (`students.xlsx` or `students_XII-IPA-A.xlsx`)
+*   **File Contents**: 
+    - Headers: NIS, Name, Class ID, Class Name, Parent Phone, Active
+    - Formatted with colored headers and auto-sized columns
+
+### 10.6 Export Attendance to Excel
+**Scenario**: Download attendance records as Excel file.
+
+*   **Endpoint**: `GET /export/attendance`
+*   **Query**: `?start_date=2024-01-01&end_date=2024-01-31&class_id=XII-IPA-A` (class_id optional)
+*   **Response**: Excel file download (`attendance_2024-01-01_2024-01-31.xlsx`)
+*   **File Contents**:
+    - Headers: Date, NIS, Student Name, Class, Status, Check In, Check Out, Notes
+    - Date and time formatting applied
+
+### 10.7 Download Master Data Template
+**Scenario**: Get template for bulk import.
+
+*   **Endpoint**: `GET /export/template/master`
+*   **Response**: Excel file download (`master_data_template.xlsx`)
+*   **File Contents**:
+    - **Students sheet**: nis, name, class_id, parent_phone (with example row)
+    - **Classes sheet**: class_id, class_name, wali_kelas_id (with example row)
+    - **Teachers sheet**: teacher_id, name, phone, role (with example row)

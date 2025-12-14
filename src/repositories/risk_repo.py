@@ -412,6 +412,83 @@ class RiskRepository:
             
         finally:
             session.close()
+    
+    def get_all_with_details(self, class_id: Optional[str] = None) -> List:
+        """
+        Get all at-risk students with full details.
+        
+        Args:
+            class_id: Optional class filter
+            
+        Returns:
+            list: List of RiskHistory records with student details
+        """
+        session = SessionLocal()
+        try:
+            # Subquery to get the latest risk history for each student
+            latest_risk = session.query(
+                RiskHistory.student_nis,
+                func.max(RiskHistory.calculated_at).label('latest')
+            ).group_by(RiskHistory.student_nis).subquery()
+            
+            # Main query joining with latest risk
+            query = session.query(RiskHistory).join(
+                latest_risk,
+                and_(
+                    RiskHistory.student_nis == latest_risk.c.student_nis,
+                    RiskHistory.calculated_at == latest_risk.c.latest
+                )
+            ).join(
+                Student, RiskHistory.student_nis == Student.nis
+            )
+            
+            # Apply class filter if provided
+            if class_id:
+                query = query.filter(Student.class_id == class_id)
+            
+            # Order by risk score descending
+            query = query.order_by(desc(RiskHistory.risk_score))
+            
+            return query.all()
+            
+        finally:
+            session.close()
+    
+    def count_by_class(self, class_id: str) -> int:
+        """
+        Count at-risk students in a class.
+        
+        Args:
+            class_id: Class ID
+            
+        Returns:
+            int: Count of at-risk students
+        """
+        session = SessionLocal()
+        try:
+            # Subquery to get the latest risk history for each student
+            latest_risk = session.query(
+                RiskHistory.student_nis,
+                func.max(RiskHistory.calculated_at).label('latest')
+            ).group_by(RiskHistory.student_nis).subquery()
+            
+            # Count students with risk in this class
+            count = session.query(RiskHistory).join(
+                latest_risk,
+                and_(
+                    RiskHistory.student_nis == latest_risk.c.student_nis,
+                    RiskHistory.calculated_at == latest_risk.c.latest
+                )
+            ).join(
+                Student, RiskHistory.student_nis == Student.nis
+            ).filter(
+                Student.class_id == class_id
+            ).count()
+            
+            return count
+            
+        finally:
+            session.close()
 
 
 # Singleton instance
