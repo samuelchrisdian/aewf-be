@@ -30,3 +30,34 @@ def token_required(f):
         return f(current_user, *args, **kwargs)
 
     return decorated
+
+
+def role_required(allowed_roles):
+    """
+    Decorator to restrict access based on user role.
+    Must be used AFTER @token_required decorator.
+    
+    Args:
+        allowed_roles: List of allowed role names (e.g., ['Admin', 'Teacher'])
+    
+    Usage:
+        @route('/admin-only')
+        @token_required
+        @role_required(['Admin'])
+        def admin_only(current_user):
+            ...
+    """
+    def decorator(f):
+        @wraps(f)
+        def decorated(current_user, *args, **kwargs):
+            if current_user.role not in allowed_roles:
+                return jsonify({
+                    'success': False,
+                    'error': {
+                        'code': 'ACCESS_DENIED',
+                        'message': f'Access denied. Required role: {", ".join(allowed_roles)}'
+                    }
+                }), 403
+            return f(current_user, *args, **kwargs)
+        return decorated
+    return decorator

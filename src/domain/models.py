@@ -10,8 +10,41 @@ class User(db.Model):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, nullable=False)
     password_hash = Column(String, nullable=False)
-    role = Column(String, default="admin")
+    email = Column(String, nullable=True)
+    role = Column(String, default="Admin")  # Admin, Teacher, Staff
+    is_active = Column(Boolean, default=True)
+    last_login = Column(DateTime, nullable=True)
+    refresh_token = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, onupdate=datetime.datetime.utcnow)
+    
+    def set_password(self, password):
+        """Hash and set the password using bcrypt."""
+        import bcrypt
+        self.password_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+    
+    def check_password(self, password):
+        """Verify password against hash using bcrypt."""
+        import bcrypt
+        return bcrypt.checkpw(password.encode('utf-8'), self.password_hash.encode('utf-8'))
+
+
+class ActivityLog(db.Model):
+    """Tracks user activity for audit purposes."""
+    __tablename__ = "activity_logs"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    action = Column(String, nullable=False)  # 'login', 'logout', 'password_change', 'create_user', etc.
+    resource_type = Column(String, nullable=True)  # 'user', 'student', 'attendance', etc.
+    resource_id = Column(String, nullable=True)  # ID of the affected resource
+    details = Column(JSON, nullable=True)  # Additional context
+    ip_address = Column(String, nullable=True)
+    user_agent = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    
+    # Relationships
+    user = relationship("User", backref="activity_logs")
 
 # --- Master Data (School) ---
 class Teacher(db.Model):

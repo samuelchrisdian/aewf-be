@@ -33,6 +33,8 @@ def create_app(config_name=None):
     from src.api.v1.reports import reports_bp
     from src.api.v1.export import export_bp
     from src.api.v1.notifications import notifications_bp
+    from src.api.v1.auth import auth_bp
+    from src.api.v1.users import users_bp
     
     app.register_blueprint(api_v1)
     app.register_blueprint(students_bp)
@@ -48,6 +50,8 @@ def create_app(config_name=None):
     app.register_blueprint(reports_bp)
     app.register_blueprint(export_bp)
     app.register_blueprint(notifications_bp)
+    app.register_blueprint(auth_bp)
+    app.register_blueprint(users_bp)
 
     # Health check
     @app.route('/health')

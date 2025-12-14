@@ -23,6 +23,11 @@ Backend service for the **Attendance Early Warning Framework (AEWF)** system. Bu
   - In-app notification center for teachers and parents.
   - Multi-channel support (In-App, Email, SMS).
   - User-configurable notification settings per teacher.
+- **Authentication & User Management**:
+  - JWT-based authentication with access and refresh tokens.
+  - Role-based access control (Admin, Teacher, Staff).
+  - Password hashing with bcrypt.
+  - Activity logging for audit trails.
 - **Architecture**:
   - Modular Flask Blueprint design.
   - SQLAlchemy ORM with PostgreSQL.
@@ -78,9 +83,27 @@ be-flask/
 |--------|------|-------------|-------------|
 | `id` | Integer | PK, Index | Unique User ID |
 | `username` | String | Unique, Not Null | Username for login |
-| `password_hash` | String | Not Null | Hashed Password |
-| `role` | String | Nullable | User Role (Admin, etc) |
+| `password_hash` | String | Not Null | Hashed Password (bcrypt) |
+| `email` | String | Nullable | User Email |
+| `role` | String | Default: Admin | User Role (Admin, Teacher, Staff) |
+| `is_active` | Boolean | Default: True | Account Active Status |
+| `last_login` | DateTime | Nullable | Last Login Timestamp |
+| `refresh_token` | String | Nullable | JWT Refresh Token |
 | `created_at` | DateTime | Nullable | Creation Timestamp |
+| `updated_at` | DateTime | Nullable | Last Update Timestamp |
+
+### `activity_logs` (Audit Trail)
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | Integer | PK, Index | Unique Log ID |
+| `user_id` | Integer | FK (`users.id`) | User who performed action |
+| `action` | String | Not Null | Action type (login, logout, etc.) |
+| `resource_type` | String | Nullable | Type of resource affected |
+| `resource_id` | String | Nullable | ID of affected resource |
+| `details` | JSON | Nullable | Additional context |
+| `ip_address` | String | Nullable | Client IP Address |
+| `user_agent` | String | Nullable | Client User Agent |
+| `created_at` | DateTime | Not Null | Timestamp |
 
 ### `machines`
 | Column | Type | Constraints | Description |
@@ -344,6 +367,25 @@ All endpoints are prefixed with `/api/v1` and require authentication token (Head
 | `DELETE` | `/notifications/<id>` | Delete a notification. |
 | `GET` | `/notifications/settings` | Get user notification preferences. |
 | `PUT` | `/notifications/settings` | Update notification preferences. |
+
+### 🔐 Authentication
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/auth/login` | User login. Returns access token and refresh token. |
+| `POST` | `/auth/logout` | User logout. Invalidates refresh token. |
+| `POST` | `/auth/refresh` | Refresh access token using refresh token. |
+| `GET` | `/auth/me` | Get current authenticated user info. |
+| `POST` | `/auth/change-password` | Change user password. |
+
+### 👥 User Management (Admin Only)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/users` | List all users. Query: `?is_active=true\|false`, `?role=Admin\|Teacher\|Staff`, `?search=` |
+| `POST` | `/users` | Create a new user. Body: `{"username": "...", "password": "...", "role": "...", "email": "..."}` |
+| `GET` | `/users/<id>` | Get user details. |
+| `PUT` | `/users/<id>` | Update user details. |
+| `DELETE` | `/users/<id>` | Soft delete user (sets is_active=false). |
+| `GET` | `/users/<id>/activity-log` | Get user activity log. Query: `?action=login\|logout\|password_change` |
 
 ## 🧪 Testing
 

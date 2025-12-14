@@ -685,3 +685,284 @@ Follow this order to ensure foreign key dependencies are met.
     }
     ```
 *   **Response**: `200 OK` with updated settings.
+
+---
+
+## 12. 🔐 Authentication
+
+### 12.1 Login
+**Scenario**: User logs in with credentials.
+
+*   **Endpoint**: `POST /auth/login`
+*   **Request Body**:
+    ```json
+    {
+        "username": "admin",
+        "password": "password123"
+    }
+    ```
+*   **Response**:
+    ```json
+    {
+        "success": true,
+        "message": "Login successful",
+        "data": {
+            "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+            "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+            "token_type": "Bearer",
+            "expires_in": 3600,
+            "user": {
+                "id": 1,
+                "username": "admin",
+                "email": "admin@example.com",
+                "role": "Admin",
+                "permissions": ["read", "write", "delete", "manage_users"]
+            }
+        }
+    }
+    ```
+
+### 12.2 Get Current User
+*   **Endpoint**: `GET /auth/me`
+*   **Headers**: `Authorization: Bearer <access_token>`
+*   **Response**:
+    ```json
+    {
+        "success": true,
+        "message": "User retrieved successfully",
+        "data": {
+            "id": 1,
+            "username": "admin",
+            "email": "admin@example.com",
+            "role": "Admin",
+            "is_active": true,
+            "last_login": "2024-12-14T10:30:00",
+            "permissions": ["read", "write", "delete", "manage_users"]
+        }
+    }
+    ```
+
+### 12.3 Refresh Token
+**Scenario**: Access token expired, get new one using refresh token.
+
+*   **Endpoint**: `POST /auth/refresh`
+*   **Request Body**:
+    ```json
+    {
+        "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+    }
+    ```
+*   **Response**:
+    ```json
+    {
+        "success": true,
+        "message": "Token refreshed successfully",
+        "data": {
+            "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+            "token_type": "Bearer",
+            "expires_in": 3600
+        }
+    }
+    ```
+
+### 12.4 Change Password
+**Scenario**: User changes their password.
+
+*   **Endpoint**: `POST /auth/change-password`
+*   **Headers**: `Authorization: Bearer <access_token>`
+*   **Request Body**:
+    ```json
+    {
+        "current_password": "oldpassword",
+        "new_password": "newpassword123",
+        "confirm_password": "newpassword123"
+    }
+    ```
+*   **Response**:
+    ```json
+    {
+        "success": true,
+        "message": "Password changed successfully"
+    }
+    ```
+
+### 12.5 Logout
+*   **Endpoint**: `POST /auth/logout`
+*   **Headers**: `Authorization: Bearer <access_token>`
+*   **Response**:
+    ```json
+    {
+        "success": true,
+        "message": "Logout successful"
+    }
+    ```
+
+---
+
+## 13. 👥 User Management (Admin Only)
+
+### 13.1 List Users
+*   **Endpoint**: `GET /users`
+*   **Headers**: `Authorization: Bearer <admin_token>`
+*   **Query**: `?is_active=true&role=Admin&search=admin`
+*   **Response**:
+    ```json
+    {
+        "success": true,
+        "message": "Users retrieved successfully",
+        "data": [
+            {
+                "id": 1,
+                "username": "admin",
+                "email": "admin@example.com",
+                "role": "Admin",
+                "is_active": true,
+                "last_login": "2024-12-14T10:30:00",
+                "created_at": "2024-01-01T00:00:00",
+                "permissions": ["read", "write", "delete", "manage_users"]
+            }
+        ],
+        "pagination": {
+            "page": 1,
+            "per_page": 20,
+            "total": 1,
+            "pages": 1
+        }
+    }
+    ```
+
+### 13.2 Create User
+*   **Endpoint**: `POST /users`
+*   **Headers**: `Authorization: Bearer <admin_token>`
+*   **Request Body**:
+    ```json
+    {
+        "username": "newteacher",
+        "password": "password123",
+        "email": "teacher@school.edu",
+        "role": "Teacher"
+    }
+    ```
+*   **Response**:
+    ```json
+    {
+        "success": true,
+        "message": "User created successfully",
+        "data": {
+            "id": 2,
+            "username": "newteacher",
+            "email": "teacher@school.edu",
+            "role": "Teacher",
+            "is_active": true,
+            "permissions": ["read", "write"]
+        }
+    }
+    ```
+
+### 13.3 Get User by ID
+*   **Endpoint**: `GET /users/2`
+*   **Headers**: `Authorization: Bearer <admin_token>`
+*   **Response**:
+    ```json
+    {
+        "success": true,
+        "message": "User retrieved successfully",
+        "data": {
+            "id": 2,
+            "username": "newteacher",
+            "email": "teacher@school.edu",
+            "role": "Teacher",
+            "is_active": true,
+            "permissions": ["read", "write"]
+        }
+    }
+    ```
+
+### 13.4 Update User
+*   **Endpoint**: `PUT /users/2`
+*   **Headers**: `Authorization: Bearer <admin_token>`
+*   **Request Body**:
+    ```json
+    {
+        "role": "Admin",
+        "email": "teacher-admin@school.edu"
+    }
+    ```
+*   **Response**:
+    ```json
+    {
+        "success": true,
+        "message": "User updated successfully",
+        "data": {
+            "id": 2,
+            "username": "newteacher",
+            "role": "Admin",
+            "email": "teacher-admin@school.edu"
+        }
+    }
+    ```
+
+### 13.5 Delete User (Soft Delete)
+*   **Endpoint**: `DELETE /users/2`
+*   **Headers**: `Authorization: Bearer <admin_token>`
+*   **Response**:
+    ```json
+    {
+        "success": true,
+        "message": "User deleted successfully"
+    }
+    ```
+
+### 13.6 Get User Activity Log
+*   **Endpoint**: `GET /users/1/activity-log`
+*   **Headers**: `Authorization: Bearer <admin_token>`
+*   **Query**: `?action=login` (optional filter)
+*   **Response**:
+    ```json
+    {
+        "success": true,
+        "message": "Activity log retrieved successfully",
+        "data": [
+            {
+                "id": 1,
+                "action": "login",
+                "resource_type": null,
+                "resource_id": null,
+                "details": null,
+                "ip_address": "127.0.0.1",
+                "created_at": "2024-12-14T10:30:00"
+            },
+            {
+                "id": 2,
+                "action": "create_user",
+                "resource_type": "user",
+                "resource_id": "2",
+                "details": {"username": "newteacher", "role": "Teacher"},
+                "ip_address": "127.0.0.1",
+                "created_at": "2024-12-14T10:35:00"
+            }
+        ],
+        "pagination": {
+            "page": 1,
+            "per_page": 20,
+            "total": 2,
+            "pages": 1
+        }
+    }
+    ```
+
+### 13.7 Access Denied Example
+**Scenario**: Non-admin user tries to access user management.
+
+*   **Endpoint**: `GET /users`
+*   **Headers**: `Authorization: Bearer <teacher_token>` (role=Teacher)
+*   **Response**:
+    ```json
+    {
+        "success": false,
+        "error": {
+            "code": "ACCESS_DENIED",
+            "message": "Access denied. Required role: Admin"
+        }
+    }
+    ```
