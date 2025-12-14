@@ -56,6 +56,8 @@ class Machine(db.Model):
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     machine_code = Column(String, unique=True, nullable=False, index=True)
     location = Column(String, nullable=True)
+    status = Column(String, default='active')  # 'active' or 'inactive'
+    last_sync = Column(DateTime, nullable=True)  # Last sync timestamp
 
     # Relationships
     users = relationship("MachineUser", back_populates="machine")

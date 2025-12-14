@@ -9,8 +9,9 @@ Backend service for the **Attendance Early Warning Framework (AEWF)** system. Bu
   - Bulk import from Excel templates.
 - **Machine & User Synchronization**:
   - Sync user data from attendance machines.
+  - **Machine Management**: Full CRUD support for fingerprint machines and user tracking.
   - **Fuzzy Mapping Engine**: Automatically map raw machine users to registered students with fuzzy logic and confidence scoring.
-  - Verification workflow for ambiguous mappings.
+  - **Enhanced Mapping Dashboard**: Bulk verification, statistics, and manual mapping management.
 - **Data Ingestion Pipeline**:
   - Import raw attendance logs from multiple machine types.
   - Automatic cleaning and processing of daily attendance.
@@ -220,12 +221,27 @@ All endpoints are prefixed with `/api/v1` and require authentication token (Head
 | `POST` | `/import/users-sync` | Upload Machine User export to sync machine users. Params: `machine_code` |
 | `POST` | `/import/attendance` | Upload Attendance Logs CSV/Excel. Params: `machine_code` |
 
+### 🖨️ Machine Management
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/machines` | List machines (filter by status, search). |
+| `POST` | `/machines` | Create a new machine. |
+| `GET` | `/machines/<id>` | Get machine details. |
+| `PUT` | `/machines/<id>` | Update machine details. |
+| `DELETE` | `/machines/<id>` | Delete machine. |
+| `GET` | `/machines/<id>/users` | List users on a specific machine. |
+
 ### 🔍 Fuzzy Mapping
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `POST` | `/mapping/process` | Run auto-mapping engine between Machine Users and Students. Body: `{"threshold": 90}` |
-| `GET` | `/mapping/suggestions` | Get list of mapping suggestions requiring manual verification. |
-| `POST` | `/mapping/verify` | Verify or reject a mapping suggestion. Body: `{"mapping_id": 1, "status": "verified"}` |
+| `GET` | `/mapping/unmapped` | List unmapped machine users with suggestions. |
+| `POST` | `/mapping/bulk-verify` | Bulk verify or reject mappings. |
+| `GET` | `/mapping/stats` | Get mapping statistics. |
+| `GET` | `/mapping/<id>` | Get mapping details. |
+| `DELETE` | `/mapping/<id>` | Delete a mapping. |
+| `POST` | `/mapping/process` | Run auto-mapping engine (Legacy). |
+| `GET` | `/mapping/suggestions` | Get list of mapping suggestions (Legacy). |
+| `POST` | `/mapping/verify` | Verify or reject a mapping suggestion (Legacy). |
 
 ### 📅 Attendance Management
 | Method | Endpoint | Description |

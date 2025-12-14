@@ -77,3 +77,25 @@ def get_pagination_params(request_args: dict) -> tuple:
         per_page = 20
     
     return page, per_page
+
+
+def paginate_query(query, page: int = 1, per_page: int = 20, max_per_page: int = 100):
+    """
+    Paginates a SQLAlchemy query and returns format with 'data' key.
+    Alias for paginate() that returns 'data' instead of 'items' for service layer.
+    
+    Args:
+        query: SQLAlchemy query object
+        page: Page number (1-indexed)
+        per_page: Items per page (default: 20)
+        max_per_page: Maximum allowed items per page (default: 100)
+    
+    Returns:
+        dict: {"data": [...], "pagination": {...}}
+    """
+    result = paginate(query, page, per_page, max_per_page)
+    return {
+        "data": result["items"],
+        "pagination": result["pagination"]
+    }
+

@@ -24,12 +24,16 @@ def create_app(config_name=None):
     from src.api.v1.classes import classes_bp
     from src.api.v1.teachers import teachers_bp
     from src.api.v1.attendance import attendance_bp
+    from src.api.v1.machines import machines_bp
+    from src.api.v1.mapping import mapping_bp
     
     app.register_blueprint(api_v1)
     app.register_blueprint(students_bp)
     app.register_blueprint(classes_bp)
     app.register_blueprint(teachers_bp)
     app.register_blueprint(attendance_bp)
+    app.register_blueprint(machines_bp)
+    app.register_blueprint(mapping_bp)
 
     # Health check
     @app.route('/health')
