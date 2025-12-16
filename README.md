@@ -51,8 +51,15 @@ be-flask/
 │   ├── ews/            # Early Warning System Logic
 │   ├── ml/             # Machine Learning Modules
 │   ├── repositories/   # Data Access Layer
-│   └── services/       # Business Logic & Orchestration
-├── tests/              # Unit and integration tests
+│   ├── seeders/        # Database Seeders (Test Data Generation)
+│   ├── schemas/        # Marshmallow Schemas
+│   ├── services/       # Business Logic & Orchestration
+│   └── utils/          # Utility functions
+├── tests/
+│   ├── datasets/       # Generated Excel test files
+│   ├── factories/      # Test data factories
+│   ├── integration/    # Integration tests
+│   └── unit/           # Unit tests
 ├── .env.example        # Environment variables template
 ├── app.py              # Application entry point
 └── requirements.txt    # Python dependencies
@@ -466,3 +473,75 @@ The system automatically extracts features from raw daily attendance logs:
 - **High Risk**: Triggers immediate alerts (`risk_alerts`) to Homeroom Teachers.
 - **Medium Risk**: Flags for observation.
 - **History**: Calculation history is preserved in `risk_history` for trend analysis.
+
+---
+
+## 🌱 Database Seeders
+
+The project includes a comprehensive test data seeder package for generating realistic test data for end-to-end testing.
+
+### Seeder Package Structure
+
+```
+src/seeders/
+├── __init__.py           # Package exports
+├── base_seeder.py        # Abstract base class
+├── master_seeder.py      # Teachers, Classes, Students
+├── machine_seeder.py     # Machine, MachineUsers
+├── attendance_seeder.py  # ImportBatch, AttendanceRawLog
+├── mapping_seeder.py     # StudentMachineMap suggestions
+├── excel_generator.py    # Excel file generation
+└── run_seeders.py        # Click CLI entry point
+```
+
+### CLI Commands
+
+```bash
+# Show all available commands
+py -m src.seeders.run_seeders --help
+
+# Run all seeders (recommended: clear existing data first)
+py -m src.seeders.run_seeders seed-all --clear
+
+# Individual seeders
+py -m src.seeders.run_seeders seed-master      # Teachers, Classes, Students
+py -m src.seeders.run_seeders seed-machine     # Machine and MachineUsers
+py -m src.seeders.run_seeders seed-attendance  # Attendance logs (14 days)
+py -m src.seeders.run_seeders seed-mapping     # Mapping suggestions
+
+# Generate Excel test files
+py -m src.seeders.run_seeders generate-excel
+```
+
+### Generated Test Data
+
+After running `seed-all`, the database will contain:
+
+| Table               | Records | Details                             |
+|---------------------|---------|-------------------------------------|
+| `teachers`          | 5       | 3 wali kelas + 2 subject teachers   |
+| `classes`           | 3       | 9A, 9B, 9C                          |
+| `students`          | 30      | 10 per class (NIS 2024001-2024030)  |
+| `machines`          | 1       | MAIN_GATE                           |
+| `machine_users`     | 40      | 20 perfect + 10 typo + 10 unmapped  |
+| `import_batches`    | ~10     | One per weekday (last 14 days)      |
+| `attendance_raw_logs` | ~600  | Realistic check-in/out patterns     |
+| `student_machine_maps` | 30   | 20 verified + 10 suggested          |
+
+### Machine User Categories
+
+The seeder creates three categories of machine users for testing fuzzy mapping:
+
+1. **Perfect Matches (20 users)**: Exact name matches with students
+2. **Typo/Variations (10 users)**: Intentional typos for fuzzy matching testing
+   - Example: "Graciela Putri" → "Graciella Putri"
+3. **Unmapped Users (10 users)**: Staff/guests that should remain unmapped
+
+### Attendance Patterns
+
+The seeder generates realistic attendance patterns:
+- **90%** check-in on-time (07:15 - 07:45)
+- **10%** check-in late (07:45 - 08:30)
+- **5%** completely absent
+- **85%** check-out recorded
+- Staff users have random scan times throughout the day
