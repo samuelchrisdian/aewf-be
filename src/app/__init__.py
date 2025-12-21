@@ -1,4 +1,5 @@
 from flask import Flask
+from flask_cors import CORS
 from .config import config
 from .extensions import db, migrate
 from .errors import register_error_handlers
@@ -10,6 +11,16 @@ def create_app(config_name=None):
 
     app = Flask(__name__)
     app.config.from_object(config[config_name])
+
+    # Initialize CORS - allow all origins for development
+    CORS(app, resources={
+        r"/*": {
+            "origins": "*",
+            "allow_headers": ["Content-Type", "Authorization", "X-Requested-With"],
+            "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+            "supports_credentials": True
+        }
+    })
 
     # Initialize extensions
     db.init_app(app)
