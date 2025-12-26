@@ -24,15 +24,15 @@ Sistem ML EWS bertujuan untuk:
 ## 🔄 Overview Flow
 
 ```
-┌─────────────────────┐     ┌─────────────────────┐     ┌─────────────────────┐
-│  1. PREPROCESSING   │────▶│  2. TRAINING        │────▶│  3. PREDICTION      │
-│  (Feature Engineer) │     │  (Model Training)   │     │  (Hybrid Engine)    │
-└─────────────────────┘     └─────────────────────┘     └─────────────────────┘
-   src/ml/preprocessing.py     src/ml/training.py      src/services/ml_service.py
-           │                          │                          │
-           ▼                          ▼                          ▼
-     Feature DataFrame          models/ews_model.pkl        Risk Prediction
-                               models/model_metadata.json    (RED/YELLOW/GREEN)
+┌─────────────────────┐     ┌─────────────────────┐     ┌─────────────────────┐     ┌─────────────────────┐
+│  1. PREPROCESSING   │────▶│  2. TRAINING        │────▶│  3. PREDICTION      │────▶│  4. INTERPRETATION  │
+│  (Feature Engineer) │     │  (Model Training)   │     │  (Hybrid Engine)    │     │  (Natural Language) │
+└─────────────────────┘     └─────────────────────┘     └─────────────────────┘     └─────────────────────┘
+   src/ml/preprocessing.py     src/ml/training.py      src/services/ml_service.py   src/ml/interpretation.py
+           │                          │                          │                          │
+           ▼                          ▼                          ▼                          ▼
+     Feature DataFrame          models/ews_model.pkl        Risk Prediction          Indonesian Text
+                               models/ews_explainer_tree.pkl (RED/YELLOW/GREEN)       (explanation_text)
 ```
 
 ---
@@ -207,6 +207,7 @@ while threshold >= 0.30:
 | File | Lokasi | Isi |
 |------|--------|-----|
 | `ews_model.pkl` | `models/` | Model Logistic Regression (pickle) |
+| `ews_explainer_tree.pkl` | `models/` | Model Decision Tree untuk explainability |
 | `model_metadata.json` | `models/` | Threshold, metrics, feature importance |
 
 ### Cara Penggunaan
@@ -221,7 +222,7 @@ print(result['metrics'])  # {'recall': 1.0, 'f1': 1.0, 'auc_roc': 1.0}
 result = train_and_save_models(my_features_df)
 
 # Load model yang sudah di-train
-model, metadata = load_model()
+model, explainer_tree, metadata = load_model()
 print(metadata['threshold'])  # 0.5
 ```
 
@@ -335,6 +336,7 @@ importance = MLService.get_feature_importance()
     "nis": "2024001",
     "risk_tier": "RED",
     "risk_probability": 0.85,
+    "explanation_text": "Faktor Utama Risiko (Berdasarkan Bobot):\n- Total Ketidakhadiran tergolong tinggi (6 hari).\n- Tren Kehadiran memburuk dalam 7 hari terakhir.\n\nLogika Deteksi (Aturan):\n- Rasio Absensi > 0.12",
     "is_rule_overridden": false,
     "prediction_method": "ml",
     "model_threshold": 0.5,
@@ -395,14 +397,16 @@ py -m src.ml.validation_script --quick
 src/
 ├── ml/
 │   ├── preprocessing.py      # Feature engineering
-│   ├── training.py          # Model training
+│   ├── training.py          # Model training (LR + DT)
+│   ├── interpretation.py    # Natural language explanation (Indonesian)
 │   └── validation_script.py # Testing & validation
 ├── services/
 │   └── ml_service.py        # Prediction service (API layer)
 └── ...
 
 models/
-├── ews_model.pkl            # Trained model
+├── ews_model.pkl            # Trained Logistic Regression model
+├── ews_explainer_tree.pkl   # Trained Decision Tree for explainability
 └── model_metadata.json      # Metadata (threshold, metrics, features)
 ```
 
@@ -549,7 +553,11 @@ Karena `absent_count` sekarang termasuk **inferred absences**:
 
 ---
 
-## 🔄 Changelog
+### v1.2 (2025-12-26)
+- ✅ Added **Explainability Module** (`src/ml/interpretation.py`)
+- ✅ Added Decision Tree explainer model (`ews_explainer_tree.pkl`)
+- ✅ Added `explanation_text` field with Indonesian natural language
+- ✅ Feature name mapping (English → Indonesian)
 
 ### v1.1 (2025-12-26)
 - ✅ Added **Inferred Absences** calculation
@@ -565,4 +573,4 @@ Karena `absent_count` sekarang termasuk **inferred absences**:
 
 ---
 
-*Dokumen ini di-generate untuk AEWF Backend v1.1 - Machine Learning Module*
+*Dokumen ini di-generate untuk AEWF Backend v1.2 - Machine Learning Module*

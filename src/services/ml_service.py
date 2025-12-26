@@ -39,6 +39,7 @@ from src.ml.preprocessing import (
     ABSENT_RATIO_THRESHOLD,
     ABSENT_COUNT_THRESHOLD,
 )
+from src.ml.interpretation import ModelInterpreter
 
 logger = logging.getLogger(__name__)
 
@@ -73,8 +74,10 @@ class MLService:
     """
 
     _model = None
+    _explainer_model = None
     _metadata = None
     _threshold = None
+    _interpreter = None
 
     @classmethod
     def _ensure_model_loaded(cls) -> bool:
@@ -87,14 +90,31 @@ class MLService:
         if cls._model is not None:
             return True
 
-        model, metadata = load_model()
+        model, explainer_tree, metadata = load_model()
         if model is None:
             logger.warning("Model not loaded. Train the model first.")
             return False
 
         cls._model = model
+        cls._explainer_model = explainer_tree
         cls._metadata = metadata
         cls._threshold = metadata.get("threshold", 0.5)
+
+        # Initialize interpreter if explainer tree is available
+        if explainer_tree is not None:
+            cls._interpreter = ModelInterpreter(
+                lr_model=model,
+                dt_model=explainer_tree,
+                feature_names=FEATURE_COLUMNS,
+            )
+            logger.info("ModelInterpreter initialized for explanations")
+        else:
+            cls._interpreter = ModelInterpreter(
+                lr_model=model,
+                dt_model=None,
+                feature_names=FEATURE_COLUMNS,
+            )
+            logger.warning("Explainer tree not available, limited explanations")
 
         logger.info(f"Model loaded with threshold: {cls._threshold}")
         return True
@@ -103,8 +123,10 @@ class MLService:
     def _unload_model(cls):
         """Unload model from memory (for retraining)."""
         cls._model = None
+        cls._explainer_model = None
         cls._metadata = None
         cls._threshold = None
+        cls._interpreter = None
 
     @staticmethod
     def train_models() -> Dict:
@@ -196,10 +218,24 @@ class MLService:
                         f"absent_count ({absent_count}) > {ABSENT_COUNT_THRESHOLD}"
                     )
 
+                # Generate explanation even for rule-triggered cases
+                explanation_text = ""
+                if MLService._interpreter is not None:
+                    try:
+                        explanation_text = MLService._interpreter.generate_natural_language_explanation(
+                            features
+                        )
+                    except Exception as ex:
+                        logger.warning(f"Failed to generate explanation: {ex}")
+                        explanation_text = "Penjelasan tidak tersedia."
+                else:
+                    explanation_text = f"Siswa terdeteksi berisiko tinggi karena: {'; '.join(rule_reason)}"
+
                 return {
                     "nis": nis,
                     "risk_tier": TIER_RED,
                     "risk_probability": 1.0,
+                    "explanation_text": explanation_text,
                     "is_rule_overridden": True,
                     "prediction_method": "rule",
                     "rule_reason": "; ".join(rule_reason),
@@ -226,6 +262,7 @@ class MLService:
                     "nis": nis,
                     "risk_tier": tier,
                     "risk_probability": prob,
+                    "explanation_text": "Penjelasan tidak tersedia - model belum dimuat.",
                     "is_rule_overridden": False,
                     "prediction_method": "heuristic",
                     "warning": "Model not loaded, using heuristic fallback",
@@ -252,10 +289,28 @@ class MLService:
 
             elapsed = (datetime.now() - start_time).total_seconds()
 
+            # Generate natural language explanation
+            explanation_text = ""
+            if MLService._interpreter is not None:
+                try:
+                    explanation_text = (
+                        MLService._interpreter.generate_natural_language_explanation(
+                            features
+                        )
+                    )
+                except Exception as ex:
+                    logger.warning(f"Failed to generate explanation: {ex}")
+                    explanation_text = "Penjelasan tidak tersedia."
+            else:
+                explanation_text = (
+                    "Penjelasan tidak tersedia - interpreter belum dimuat."
+                )
+
             return {
                 "nis": nis,
                 "risk_tier": tier,
                 "risk_probability": round(float(probability), 4),
+                "explanation_text": explanation_text,
                 "is_rule_overridden": False,
                 "prediction_method": "ml",
                 "model_threshold": threshold,
@@ -273,6 +328,7 @@ class MLService:
                 "nis": nis,
                 "risk_tier": TIER_GREEN,
                 "risk_probability": 0.0,
+                "explanation_text": "Penjelasan tidak tersedia karena terjadi kesalahan.",
                 "is_rule_overridden": False,
                 "prediction_method": "error",
                 "error": str(e),

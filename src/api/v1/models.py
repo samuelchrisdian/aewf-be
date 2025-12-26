@@ -1,165 +1,176 @@
 """
 ML Model Management API endpoints.
 Provides operations for ML model information and retraining.
+Uses the new EWS model (ews_model.pkl) with Logistic Regression.
 """
+
 from flask import Blueprint
 import os
-import pickle
 from datetime import datetime
 
 from src.app.middleware import token_required
 from src.services.ml_service import MLService
-from src.utils.response_helpers import (
-    success_response,
-    error_response
-)
+from src.utils.response_helpers import success_response, error_response
 
 
-models_bp = Blueprint('models', __name__, url_prefix='/api/v1/models')
-
-MODEL_DIR = "models"
-LR_MODEL_PATH = os.path.join(MODEL_DIR, "lr_model.pkl")
-DT_MODEL_PATH = os.path.join(MODEL_DIR, "dt_model.pkl")
+models_bp = Blueprint("models", __name__, url_prefix="/api/v1/models")
 
 
-def _get_model_info(model_path: str, model_name: str) -> dict:
-    """Get information about a saved model."""
-    if not os.path.exists(model_path):
-        return {
-            "name": model_name,
-            "status": "not_found",
-            "version": None,
-            "trained_at": None,
-            "file_size": None
-        }
-    
-    try:
-        # Get file stats
-        file_stats = os.stat(model_path)
-        modified_time = datetime.fromtimestamp(file_stats.st_mtime)
-        
-        # Try to load model for additional info
-        with open(model_path, 'rb') as f:
-            model = pickle.load(f)
-        
-        # Get model type
-        model_type = type(model).__name__
-        
-        return {
-            "name": model_name,
-            "status": "available",
-            "version": "1.0",
-            "model_type": model_type,
-            "trained_at": modified_time.isoformat(),
-            "file_size_bytes": file_stats.st_size
-        }
-    except Exception as e:
-        return {
-            "name": model_name,
-            "status": "error",
-            "error": str(e)
-        }
-
-
-@models_bp.route('/info', methods=['GET'])
+@models_bp.route("/info", methods=["GET"])
 @token_required
 def get_models_info(current_user):
     """
-    Get information about trained ML models.
-    
+    Get information about the trained ML model.
+
     Returns:
-        Model metadata including version, training time, and type
+        Model metadata including version, training time, metrics, and type
     """
-    lr_info = _get_model_info(LR_MODEL_PATH, "logistic_regression")
-    dt_info = _get_model_info(DT_MODEL_PATH, "decision_tree")
-    
+    model_info = MLService.get_model_info()
+
     return success_response(
         data={
-            "logistic_regression": lr_info,
-            "decision_tree": dt_info,
-            "model_directory": MODEL_DIR
+            "ews_model": model_info,
+            "model_type": "Logistic Regression with SMOTE",
+            "description": "Hybrid ML + Rule-based Early Warning System",
         },
-        message="Model information retrieved successfully"
+        message="Model information retrieved successfully",
     )
 
 
-@models_bp.route('/performance', methods=['GET'])
+@models_bp.route("/performance", methods=["GET"])
 @token_required
 def get_models_performance(current_user):
     """
-    Get performance metrics for trained ML models.
-    
+    Get performance metrics for the trained ML model.
+
     Returns:
-        Model performance metrics (accuracy, precision, recall, etc.)
-    
-    Note: In production, these should be stored during training.
-    Currently returns placeholder metrics.
+        Model performance metrics (recall, F1, AUC-ROC, threshold)
     """
-    # Check if models exist
-    lr_exists = os.path.exists(LR_MODEL_PATH)
-    dt_exists = os.path.exists(DT_MODEL_PATH)
-    
+    model_info = MLService.get_model_info()
+
+    if model_info.get("status") == "no_model":
+        return success_response(
+            data={
+                "status": "not_trained",
+                "message": "No trained model found. Please train the model first.",
+            },
+            message="Model not yet trained",
+        )
+
+    metrics = model_info.get("metrics", {})
+
     performance = {
-        "logistic_regression": {
-            "status": "available" if lr_exists else "not_trained",
+        "ews_model": {
+            "status": model_info.get("status", "unknown"),
+            "model_type": model_info.get("model_type", "LogisticRegression"),
+            "trained_at": model_info.get("trained_at"),
+            "threshold": model_info.get("threshold", 0.5),
             "metrics": {
-                "accuracy": 0.89,
-                "precision": 0.85,
-                "recall": 0.82,
-                "f1_score": 0.83
-            } if lr_exists else None,
-            "training_samples": 2500 if lr_exists else 0,
-            "notes": "Metrics are estimated. Actual metrics stored during training."
+                "recall": metrics.get("recall", 0),
+                "f1_score": metrics.get("f1", 0),
+                "auc_roc": metrics.get("auc_roc", 0),
+                "precision": metrics.get("precision", 0),
+                "accuracy": metrics.get("accuracy", 0),
+            },
+            "targets": {"recall": "≥ 0.70", "f1_score": "≥ 0.65", "auc_roc": "≥ 0.75"},
+            "all_targets_met": all(
+                [
+                    metrics.get("recall", 0) >= 0.70,
+                    metrics.get("f1", 0) >= 0.65,
+                    metrics.get("auc_roc", 0) >= 0.75,
+                ]
+            ),
         },
-        "decision_tree": {
-            "status": "available" if dt_exists else "not_trained",
-            "metrics": {
-                "accuracy": 0.87,
-                "precision": 0.83,
-                "recall": 0.80,
-                "f1_score": 0.81
-            } if dt_exists else None,
-            "training_samples": 2500 if dt_exists else 0,
-            "notes": "Metrics are estimated. Actual metrics stored during training."
-        },
-        "comparison": {
-            "best_model": "logistic_regression" if lr_exists else None,
-            "recommendation": "Logistic Regression performs slightly better for this dataset"
-        }
+        "feature_importance": MLService.get_feature_importance(),
+        "config": model_info.get("config", {}),
     }
-    
+
     return success_response(
-        data=performance,
-        message="Model performance retrieved successfully"
+        data=performance, message="Model performance retrieved successfully"
     )
 
 
-@models_bp.route('/retrain', methods=['POST'])
+@models_bp.route("/retrain", methods=["POST"])
+@models_bp.route("/train", methods=["POST"])
 @token_required
 def retrain_models(current_user):
     """
     Trigger model retraining.
-    
+
     This endpoint starts the ML model training pipeline.
-    In production, this should be a background task.
-    
+    Uses SMOTE for handling imbalanced data and automatic threshold tuning.
+
     Returns:
-        Training status and results
+        Training status and results including metrics
     """
     try:
         result = MLService.train_models()
-        
+
+        if result.get("status") == "error":
+            return error_response(
+                message=result.get("message", "Training failed"),
+                code="TRAINING_ERROR",
+                status_code=500,
+            )
+
         return success_response(
             data={
                 "status": result.get("status", "completed"),
-                "message": result.get("message", "Models retrained successfully"),
-                "models_updated": ["logistic_regression", "decision_tree"]
+                "message": result.get("message", "Model trained successfully"),
+                "metrics": result.get("metrics"),
+                "threshold": result.get("threshold"),
+                "all_criteria_met": result.get("all_criteria_met", False),
+                "model_type": "LogisticRegression",
             },
-            message="Model retraining completed successfully"
+            message="Model training completed successfully",
         )
     except Exception as e:
         return error_response(
-            message=f"Model retraining failed: {str(e)}",
+            message=f"Model training failed: {str(e)}",
             code="TRAINING_ERROR",
-            status_code=500
+            status_code=500,
         )
+
+
+@models_bp.route("/predict/<nis>", methods=["GET"])
+@token_required
+def predict_student_risk(current_user, nis: str):
+    """
+    Get ML risk prediction for a specific student.
+
+    Args:
+        nis: Student NIS identifier
+
+    Returns:
+        Risk prediction with tier, probability, and factors
+    """
+    try:
+        result = MLService.predict_risk(nis)
+
+        return success_response(data=result, message="Risk prediction completed")
+    except Exception as e:
+        return error_response(
+            message=f"Prediction failed: {str(e)}",
+            code="PREDICTION_ERROR",
+            status_code=500,
+        )
+
+
+@models_bp.route("/features", methods=["GET"])
+@token_required
+def get_feature_importance(current_user):
+    """
+    Get feature importance from the trained model.
+
+    Returns:
+        List of features with their importance scores (coefficients)
+    """
+    importance = MLService.get_feature_importance()
+
+    return success_response(
+        data={
+            "features": importance,
+            "description": "Higher positive values increase risk, negative values decrease risk",
+        },
+        message="Feature importance retrieved successfully",
+    )

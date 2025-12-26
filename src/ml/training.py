@@ -20,6 +20,7 @@ from datetime import datetime
 from typing import Dict, Tuple, Optional
 
 from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
 from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.metrics import (
     recall_score,
@@ -50,6 +51,7 @@ logger = logging.getLogger(__name__)
 
 MODEL_DIR = "models"
 MODEL_PATH = os.path.join(MODEL_DIR, "ews_model.pkl")
+EXPLAINER_MODEL_PATH = os.path.join(MODEL_DIR, "ews_explainer_tree.pkl")
 METADATA_PATH = os.path.join(MODEL_DIR, "model_metadata.json")
 
 # Training configuration
@@ -141,6 +143,16 @@ def train_model_with_threshold_tuning(
 
     model.fit(X_train_res, y_train_res)
 
+    # Train Decision Tree for explainability (interpretable rules)
+    explainer_tree = DecisionTreeClassifier(
+        max_depth=4,  # Keep shallow for interpretability
+        min_samples_leaf=5,  # Ensure meaningful rules
+        random_state=42,
+        class_weight="balanced",
+    )
+    explainer_tree.fit(X_train_res, y_train_res)
+    logger.info("Decision Tree explainer trained for interpretability")
+
     # Get probability predictions
     y_proba = model.predict_proba(X_test)[:, 1]
 
@@ -225,7 +237,7 @@ def train_model_with_threshold_tuning(
     logger.info(f"  TN: {cm[0][0]:3d}  FP: {cm[0][1]:3d}")
     logger.info(f"  FN: {cm[1][0]:3d}  TP: {cm[1][1]:3d}")
 
-    return model, best_threshold, best_metrics
+    return model, explainer_tree, best_threshold, best_metrics
 
 
 def log_feature_importance(model: LogisticRegression, feature_columns: list):
@@ -256,6 +268,7 @@ def log_feature_importance(model: LogisticRegression, feature_columns: list):
 
 def save_model_and_metadata(
     model: LogisticRegression,
+    explainer_tree: DecisionTreeClassifier,
     threshold: float,
     metrics: Dict,
     feature_columns: list,
@@ -268,19 +281,29 @@ def save_model_and_metadata(
     - models/ews_model.pkl: Trained model
     - models/model_metadata.json: Training metadata
     """
-    # Save model
+    # Save main model (Logistic Regression)
     with open(MODEL_PATH, "wb") as f:
         pickle.dump(model, f)
     logger.info(f"Model saved to: {MODEL_PATH}")
+
+    # Save explainer model (Decision Tree)
+    with open(EXPLAINER_MODEL_PATH, "wb") as f:
+        pickle.dump(explainer_tree, f)
+    logger.info(f"Explainer tree saved to: {EXPLAINER_MODEL_PATH}")
 
     # Save metadata
     metadata = {
         "trained_at": datetime.now().isoformat(),
         "model_type": "LogisticRegression",
+        "explainer_type": "DecisionTree",
         "threshold": threshold,
         "feature_columns": feature_columns,
         "metrics": metrics,
         "feature_importance": feature_importance,
+        "explainer_config": {
+            "max_depth": 4,
+            "min_samples_leaf": 5,
+        },
         "config": {
             "target_recall": TARGET_RECALL,
             "target_f1": TARGET_F1,
@@ -343,8 +366,8 @@ def train_and_save_models(features_df: pd.DataFrame = None) -> Dict:
 
         logger.info(f"Train set: {len(X_train)}, Test set: {len(X_test)}")
 
-        # Train with threshold tuning
-        model, threshold, metrics = train_model_with_threshold_tuning(
+        # Train with threshold tuning (returns model, explainer_tree, threshold, metrics)
+        model, explainer_tree, threshold, metrics = train_model_with_threshold_tuning(
             X_train, X_test, y_train, y_test
         )
 
@@ -353,7 +376,12 @@ def train_and_save_models(features_df: pd.DataFrame = None) -> Dict:
 
         # Save model and metadata
         save_model_and_metadata(
-            model, threshold, metrics, FEATURE_COLUMNS, feature_importance
+            model,
+            explainer_tree,
+            threshold,
+            metrics,
+            FEATURE_COLUMNS,
+            feature_importance,
         )
 
         # Check if criteria met
@@ -394,29 +422,41 @@ def train_and_save_models(features_df: pd.DataFrame = None) -> Dict:
         return {"status": "error", "message": str(e)}
 
 
-def load_model() -> Tuple[Optional[LogisticRegression], Optional[Dict]]:
+def load_model() -> (
+    Tuple[
+        Optional[LogisticRegression], Optional[DecisionTreeClassifier], Optional[Dict]
+    ]
+):
     """
-    Load trained model and metadata.
+    Load trained model, explainer tree, and metadata.
 
     Returns:
-        Tuple of (model, metadata) or (None, None) if not found
+        Tuple of (model, explainer_tree, metadata) or (None, None, None) if not found
     """
     try:
         if not os.path.exists(MODEL_PATH) or not os.path.exists(METADATA_PATH):
             logger.warning("Model or metadata file not found")
-            return None, None
+            return None, None, None
 
         with open(MODEL_PATH, "rb") as f:
             model = pickle.load(f)
 
+        # Load explainer tree (optional - may not exist for older models)
+        explainer_tree = None
+        if os.path.exists(EXPLAINER_MODEL_PATH):
+            with open(EXPLAINER_MODEL_PATH, "rb") as f:
+                explainer_tree = pickle.load(f)
+        else:
+            logger.warning("Explainer tree not found, explanations will be limited")
+
         with open(METADATA_PATH, "r") as f:
             metadata = json.load(f)
 
-        return model, metadata
+        return model, explainer_tree, metadata
 
     except Exception as e:
         logger.error(f"Error loading model: {e}")
-        return None, None
+        return None, None, None
 
 
 if __name__ == "__main__":

@@ -489,9 +489,13 @@ Total Absent = Recorded Absent + Inferred Absent
 
 ### 2. Model Training (`src/ml/training.py`)
 - **Algorithm**: Logistic Regression with `class_weight='balanced'`
+- **Explainer**: Decision Tree with `max_depth=4` for interpretability
 - **Imbalance Handling**: SMOTE (Synthetic Minority Over-sampling)
 - **Threshold Tuning**: Automatic threshold reduction (0.50 → 0.30) if Recall < 0.70
-- **Output**: `models/ews_model.pkl` + `models/model_metadata.json`
+- **Output**: 
+  - `models/ews_model.pkl` (Logistic Regression)
+  - `models/ews_explainer_tree.pkl` (Decision Tree for explanations)
+  - `models/model_metadata.json`
 
 ### 3. Hybrid Risk Prediction (`src/services/ml_service.py`)
 The system uses a **hybrid approach** combining rules and ML:
@@ -517,6 +521,24 @@ The system uses a **hybrid approach** combining rules and ML:
 | RED | 🔴 | Prob > 0.70 or Rule Triggered | Contact parent immediately |
 | YELLOW | 🟡 | Prob 0.40 - 0.70 | Close monitoring for 2 weeks |
 | GREEN | 🟢 | Prob < 0.40 | Regular monitoring |
+
+### 5. Explainability (`src/ml/interpretation.py`)
+The system generates **Indonesian natural language explanations** for teachers:
+
+```
+Faktor Utama Risiko (Berdasarkan Bobot):
+- Total Ketidakhadiran tergolong tinggi (6 hari).
+- Tren Kehadiran memburuk dalam 7 hari terakhir.
+
+Logika Deteksi (Aturan):
+- Rasio Absensi > 0.12
+- Tren Kehadiran (Mingguan) ≤ -0.50
+```
+
+**How it works:**
+- Analyzes Logistic Regression coefficients to identify top 3 contributing factors
+- Extracts Decision Tree decision path to show IF-THEN rules
+- Translates technical feature names to readable Indonesian
 
 For detailed ML documentation, see [ML_FLOW_GUIDE.md](./ML_FLOW_GUIDE.md).
 
