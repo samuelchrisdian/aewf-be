@@ -1,0 +1,89 @@
+{
+  "trained_at": "2025-12-26T12:40:34.766128",
+  "model_type": "LogisticRegression",
+  "threshold": 0.5,
+  "feature_columns": [
+    "absent_count",
+    "late_count",
+    "present_count",
+    "permission_count",
+    "sick_count",
+    "total_days",
+    "absent_ratio",
+    "late_ratio",
+    "attendance_ratio",
+    "trend_score",
+    "is_rule_triggered"
+  ],
+  "metrics": {
+    "threshold": 0.5,
+    "recall": 0.8888888888888888,
+    "f1": 0.9411764705882353,
+    "precision": 1.0,
+    "auc_roc": 1.0
+  },
+  "feature_importance": [
+    {
+      "feature": "absent_count",
+      "coefficient": 1.7120834349469503,
+      "abs_importance": 1.7120834349469503
+    },
+    {
+      "feature": "present_count",
+      "coefficient": -0.8960098230931904,
+      "abs_importance": 0.8960098230931904
+    },
+    {
+      "feature": "late_count",
+      "coefficient": -0.814429748859188,
+      "abs_importance": 0.814429748859188
+    },
+    {
+      "feature": "is_rule_triggered",
+      "coefficient": 0.24555575073664282,
+      "abs_importance": 0.24555575073664282
+    },
+    {
+      "feature": "absent_ratio",
+      "coefficient": 0.08152778261631839,
+      "abs_importance": 0.08152778261631839
+    },
+    {
+      "feature": "attendance_ratio",
+      "coefficient": -0.04266713443316,
+      "abs_importance": 0.04266713443316
+    },
+    {
+      "feature": "late_ratio",
+      "coefficient": -0.038782368993319244,
+      "abs_importance": 0.038782368993319244
+    },
+    {
+      "feature": "total_days",
+      "coefficient": 0.001643862982682558,
+      "abs_importance": 0.001643862982682558
+    },
+    {
+      "feature": "sick_count",
+      "coefficient": 0.0,
+      "abs_importance": 0.0
+    },
+    {
+      "feature": "permission_count",
+      "coefficient": 0.0,
+      "abs_importance": 0.0
+    },
+    {
+      "feature": "trend_score",
+      "coefficient": 0.0,
+      "abs_importance": 0.0
+    }
+  ],
+  "config": {
+    "target_recall": 0.7,
+    "target_f1": 0.65,
+    "target_auc_roc": 0.75,
+    "class_weight": "balanced",
+    "smote_applied": true
+  }
+}

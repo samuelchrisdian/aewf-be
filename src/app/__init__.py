@@ -1,26 +1,36 @@
 from flask import Flask
 from flask_cors import CORS
+from dotenv import load_dotenv
+import os
+
+# Load environment variables BEFORE importing config
+# This ensures DATABASE_URL is available when Config class is defined
+load_dotenv()
+
 from .config import config
 from .extensions import db, migrate
 from .errors import register_error_handlers
-import os
+
 
 def create_app(config_name=None):
     if config_name is None:
-        config_name = os.environ.get('FLASK_CONFIG', 'default')
+        config_name = os.environ.get("FLASK_CONFIG", "default")
 
     app = Flask(__name__)
     app.config.from_object(config[config_name])
 
     # Initialize CORS - allow all origins for development
-    CORS(app, resources={
-        r"/*": {
-            "origins": "*",
-            "allow_headers": ["Content-Type", "Authorization", "X-Requested-With"],
-            "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-            "supports_credentials": True
-        }
-    })
+    CORS(
+        app,
+        resources={
+            r"/*": {
+                "origins": "*",
+                "allow_headers": ["Content-Type", "Authorization", "X-Requested-With"],
+                "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+                "supports_credentials": True,
+            }
+        },
+    )
 
     # Initialize extensions
     db.init_app(app)
@@ -47,7 +57,7 @@ def create_app(config_name=None):
     from src.api.v1.auth import auth_bp
     from src.api.v1.users import users_bp
     from src.api.v1.config import config_bp
-    
+
     app.register_blueprint(api_v1)
     app.register_blueprint(students_bp)
     app.register_blueprint(classes_bp)
@@ -67,7 +77,7 @@ def create_app(config_name=None):
     app.register_blueprint(config_bp)
 
     # Health check
-    @app.route('/health')
+    @app.route("/health")
     def health():
         return {"status": "ok"}
 
