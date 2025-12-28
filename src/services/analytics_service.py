@@ -2,11 +2,12 @@
 Analytics service for business logic.
 Handles all business operations for analytics data.
 """
-from typing import Optional
+from typing import Optional, Any
 from datetime import date, datetime
 
 from src.repositories.analytics_repo import analytics_repository
 from src.repositories.student_repo import student_repository
+from src.repositories.teacher_repo import teacher_repository
 
 
 class AnalyticsService:
@@ -19,16 +20,18 @@ class AnalyticsService:
         self,
         period: str = "weekly",
         start_date: Optional[str] = None,
-        end_date: Optional[str] = None
+        end_date: Optional[str] = None,
+        current_user: Optional[Any] = None
     ) -> dict:
         """
-        Get attendance trend data for charts.
-        
+        Get attendance trend data for charts with role-based filtering.
+
         Args:
             period: "weekly" or "monthly"
             start_date: Start of date range (YYYY-MM-DD)
             end_date: End of date range (YYYY-MM-DD)
-            
+            current_user: Current authenticated user (for role-based filtering)
+
         Returns:
             dict: Trend data with metadata and data points
         """
@@ -36,11 +39,23 @@ class AnalyticsService:
         parsed_start = self._parse_date(start_date)
         parsed_end = self._parse_date(end_date)
         
+        # Role-based filtering
+        class_ids = None
+        if current_user and current_user.role == 'Teacher':
+            # Get classes managed by this teacher (wali kelas)
+            teacher_classes = teacher_repository.get_classes_by_teacher(current_user.username)
+            if teacher_classes:
+                class_ids = [cls.class_id for cls in teacher_classes]
+            else:
+                # Teacher has no classes, return empty result
+                class_ids = []
+
         # Get trends from repository
         trends = self.repository.get_attendance_trends(
             period=period,
             start_date=parsed_start,
-            end_date=parsed_end
+            end_date=parsed_end,
+            class_ids=class_ids
         )
         
         return {
@@ -51,18 +66,37 @@ class AnalyticsService:
             "trends": trends
         }
     
-    def get_class_comparison(self, period: Optional[str] = None) -> dict:
+    def get_class_comparison(
+        self,
+        period: Optional[str] = None,
+        current_user: Optional[Any] = None
+    ) -> dict:
         """
-        Get class comparison statistics.
-        
+        Get class comparison statistics with role-based filtering.
+
         Args:
             period: Month period (YYYY-MM)
-            
+            current_user: Current authenticated user (for role-based filtering)
+
         Returns:
             dict: Class comparison data
         """
-        comparison = self.repository.get_class_comparison(period=period)
-        
+        # Role-based filtering
+        class_ids = None
+        if current_user and current_user.role == 'Teacher':
+            # Get classes managed by this teacher (wali kelas)
+            teacher_classes = teacher_repository.get_classes_by_teacher(current_user.username)
+            if teacher_classes:
+                class_ids = [cls.class_id for cls in teacher_classes]
+            else:
+                # Teacher has no classes, return empty result
+                class_ids = []
+
+        comparison = self.repository.get_class_comparison(
+            period=period,
+            class_ids=class_ids
+        )
+
         # Calculate additional insights
         if comparison:
             rates = [c["attendance_rate"] for c in comparison]

@@ -2,7 +2,7 @@
 Class service for business logic.
 Handles all business operations for Class entity.
 """
-from typing import Optional, Tuple, List
+from typing import Optional, Tuple, List, Any
 from marshmallow import ValidationError
 from sqlalchemy import func
 
@@ -22,15 +22,30 @@ class ClassService:
     def __init__(self):
         self.repository = class_repository
     
-    def get_classes(self) -> List[dict]:
+    def get_classes(self, current_user: Optional[Any] = None) -> List[dict]:
         """
         Get all classes with student count and wali kelas info.
         
+        Args:
+            current_user: Current authenticated user (for role-based filtering)
+
         Returns:
             List of class data dicts
         """
-        results = self.repository.get_all_with_student_count()
-        
+        # Role-based filtering
+        if current_user and current_user.role == 'Teacher':
+            # Get only classes managed by this teacher
+            teacher_classes = teacher_repository.get_classes_by_teacher(current_user.username)
+            if not teacher_classes:
+                return []
+
+            # Get class IDs
+            class_ids = [cls.class_id for cls in teacher_classes]
+            results = self.repository.get_by_ids_with_student_count(class_ids)
+        else:
+            # Admin gets all classes
+            results = self.repository.get_all_with_student_count()
+
         classes_data = []
         for item in results:
             cls = item["class"]

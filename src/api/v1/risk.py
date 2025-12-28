@@ -31,6 +31,10 @@ def get_risk_list(current_user):
         - page: Page number (default: 1)
         - per_page: Items per page (default: 20)
     
+    Note:
+        - Admin role: Returns all at-risk students
+        - Teacher role: Returns only at-risk students from their classes
+
     Returns:
         Paginated list of at-risk students sorted by risk score
     """
@@ -50,7 +54,8 @@ def get_risk_list(current_user):
         level=level,
         class_id=class_id,
         page=page,
-        per_page=per_page
+        per_page=per_page,
+        current_user=current_user
     )
     
     return paginated_response(

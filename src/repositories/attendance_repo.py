@@ -30,6 +30,7 @@ class AttendanceRepository:
         self,
         attendance_date: Optional[date] = None,
         class_id: Optional[str] = None,
+        class_ids: Optional[List[str]] = None,
         status: Optional[str] = None,
         start_date: Optional[date] = None,
         end_date: Optional[date] = None
@@ -39,7 +40,8 @@ class AttendanceRepository:
         
         Args:
             attendance_date: Specific date filter
-            class_id: Filter by class
+            class_id: Filter by class (single)
+            class_ids: Filter by multiple class IDs (for teacher role)
             status: Filter by status
             start_date: Start of date range
             end_date: End of date range
@@ -57,7 +59,13 @@ class AttendanceRepository:
         
         if class_id:
             query = query.filter(Student.class_id == class_id)
-        
+        elif class_ids is not None:
+            if len(class_ids) == 0:
+                # Teacher has no classes, return empty query
+                query = query.filter(False)
+            else:
+                query = query.filter(Student.class_id.in_(class_ids))
+
         if status:
             query = query.filter(AttendanceDaily.status == status)
         

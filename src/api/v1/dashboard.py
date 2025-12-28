@@ -24,11 +24,15 @@ def get_dashboard_stats(current_user):
         - this_month: Monthly statistics with trend
         - risk_summary: Students by risk level
     
+    Note:
+        - Admin role: Returns all statistics
+        - Teacher role: Returns statistics only for their classes (as wali kelas)
+
     Returns:
         Dashboard statistics JSON response
     """
-    stats = dashboard_service.get_dashboard_stats()
-    
+    stats = dashboard_service.get_dashboard_stats(current_user=current_user)
+
     return success_response(
         data=stats,
         message="Dashboard stats retrieved successfully"

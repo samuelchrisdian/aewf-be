@@ -19,6 +19,7 @@ class RiskRepository:
         self,
         level: Optional[str] = None,
         class_id: Optional[str] = None,
+        class_ids: Optional[List[str]] = None,
         page: int = 1,
         per_page: int = 20
     ) -> tuple:
@@ -27,7 +28,8 @@ class RiskRepository:
         
         Args:
             level: Filter by risk level ('high', 'medium', 'low')
-            class_id: Filter by class
+            class_id: Filter by class (single)
+            class_ids: Filter by multiple class IDs (for teacher role)
             page: Page number
             per_page: Items per page
             
@@ -65,7 +67,12 @@ class RiskRepository:
                 query = query.filter(RiskHistory.risk_level == level)
             if class_id:
                 query = query.filter(Student.class_id == class_id)
-            
+            elif class_ids is not None:
+                if len(class_ids) == 0:
+                    # Teacher has no classes, return empty
+                    return [], 0
+                query = query.filter(Student.class_id.in_(class_ids))
+
             # Order by risk score descending
             query = query.order_by(desc(RiskHistory.risk_score))
             

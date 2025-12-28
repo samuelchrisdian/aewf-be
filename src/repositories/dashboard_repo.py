@@ -2,7 +2,7 @@
 Dashboard repository for database operations.
 Handles all direct database interactions for dashboard statistics.
 """
-from typing import Optional
+from typing import Optional, List
 from datetime import date, datetime, timedelta
 from calendar import monthrange
 from sqlalchemy import func, and_, case
@@ -13,20 +13,47 @@ from src.app.extensions import db
 class DashboardRepository:
     """Repository class for dashboard statistics database operations."""
     
-    def get_entity_counts(self) -> dict:
+    def get_entity_counts(self, class_ids: Optional[List[str]] = None) -> dict:
         """
         Get counts of main entities.
         
+        Args:
+            class_ids: Filter by class IDs (for teacher role)
+
         Returns:
             dict: Entity counts (students, active students, classes, teachers)
         """
-        total_students = db.session.query(func.count(Student.nis)).scalar() or 0
-        active_students = db.session.query(func.count(Student.nis)).filter(
+        # Build student queries with optional class filter
+        student_query = db.session.query(func.count(Student.nis))
+        active_student_query = db.session.query(func.count(Student.nis)).filter(
             Student.is_active == True
-        ).scalar() or 0
-        total_classes = db.session.query(func.count(Class.class_id)).scalar() or 0
-        total_teachers = db.session.query(func.count(Teacher.teacher_id)).scalar() or 0
-        
+        )
+
+        if class_ids is not None:
+            if len(class_ids) == 0:
+                # Teacher has no classes
+                return {
+                    "total_students": 0,
+                    "active_students": 0,
+                    "total_classes": 0,
+                    "total_teachers": 0
+                }
+            student_query = student_query.filter(Student.class_id.in_(class_ids))
+            active_student_query = active_student_query.filter(Student.class_id.in_(class_ids))
+
+        total_students = student_query.scalar() or 0
+        active_students = active_student_query.scalar() or 0
+
+        # For teacher role, count only their classes
+        if class_ids is not None:
+            total_classes = len(class_ids)
+            # Teachers count is 1 for the teacher themselves
+            total_teachers = 1
+        else:
+            # Admin gets all counts
+            total_classes = db.session.query(func.count(Class.class_id)).scalar() or 0
+            total_teachers = db.session.query(func.count(Teacher.teacher_id)).scalar() or 0
+
         return {
             "total_students": total_students,
             "active_students": active_students,
@@ -34,27 +61,50 @@ class DashboardRepository:
             "total_teachers": total_teachers
         }
     
-    def get_today_attendance(self, target_date: Optional[date] = None) -> dict:
+    def get_today_attendance(
+        self,
+        target_date: Optional[date] = None,
+        class_ids: Optional[List[str]] = None
+    ) -> dict:
         """
         Get attendance breakdown for a specific date.
         
         Args:
             target_date: Date to check (defaults to today)
-            
+            class_ids: Filter by class IDs (for teacher role)
+
         Returns:
             dict: Today's attendance statistics
         """
         if target_date is None:
             target_date = date.today()
         
-        # Count by status for the target date
+        # Build query with optional class filter
         query = db.session.query(
             AttendanceDaily.status,
             func.count(AttendanceDaily.id).label('count')
         ).filter(
             AttendanceDaily.attendance_date == target_date
-        ).group_by(AttendanceDaily.status)
-        
+        )
+
+        # Add class filter if provided
+        if class_ids is not None:
+            if len(class_ids) == 0:
+                # Teacher has no classes, return zero stats
+                return {
+                    "date": target_date.isoformat(),
+                    "present": 0,
+                    "late": 0,
+                    "absent": 0,
+                    "sick": 0,
+                    "permission": 0,
+                    "rate": 0.0
+                }
+            # Join with Student to filter by class_id
+            query = query.join(Student, AttendanceDaily.student_nis == Student.nis)
+            query = query.filter(Student.class_id.in_(class_ids))
+
+        query = query.group_by(AttendanceDaily.status)
         results = query.all()
         
         # Initialize counts
@@ -89,7 +139,8 @@ class DashboardRepository:
     def get_month_attendance(
         self,
         year: Optional[int] = None,
-        month: Optional[int] = None
+        month: Optional[int] = None,
+        class_ids: Optional[List[str]] = None
     ) -> dict:
         """
         Get aggregated attendance statistics for a month.
@@ -97,7 +148,8 @@ class DashboardRepository:
         Args:
             year: Year (defaults to current year)
             month: Month (defaults to current month)
-            
+            class_ids: Filter by class IDs (for teacher role)
+
         Returns:
             dict: Monthly attendance statistics
         """
@@ -111,7 +163,7 @@ class DashboardRepository:
         last_day_num = monthrange(year, month)[1]
         last_day = date(year, month, last_day_num)
         
-        # Count by status for the month
+        # Build query with optional class filter
         query = db.session.query(
             AttendanceDaily.status,
             func.count(AttendanceDaily.id).label('count')
@@ -120,8 +172,23 @@ class DashboardRepository:
                 AttendanceDaily.attendance_date >= first_day,
                 AttendanceDaily.attendance_date <= last_day
             )
-        ).group_by(AttendanceDaily.status)
-        
+        )
+
+        # Add class filter if provided
+        if class_ids is not None:
+            if len(class_ids) == 0:
+                # Teacher has no classes, return zero stats
+                return {
+                    "average_rate": 0.0,
+                    "trend": "+0.0%",
+                    "total_lates": 0,
+                    "total_absents": 0
+                }
+            # Join with Student to filter by class_id
+            query = query.join(Student, AttendanceDaily.student_nis == Student.nis)
+            query = query.filter(Student.class_id.in_(class_ids))
+
+        query = query.group_by(AttendanceDaily.status)
         results = query.all()
         
         counts = {
@@ -159,8 +226,14 @@ class DashboardRepository:
                 AttendanceDaily.attendance_date >= prev_first_day,
                 AttendanceDaily.attendance_date <= prev_last_day
             )
-        ).group_by(AttendanceDaily.status)
-        
+        )
+
+        # Add class filter to previous month query
+        if class_ids is not None and len(class_ids) > 0:
+            prev_query = prev_query.join(Student, AttendanceDaily.student_nis == Student.nis)
+            prev_query = prev_query.filter(Student.class_id.in_(class_ids))
+
+        prev_query = prev_query.group_by(AttendanceDaily.status)
         prev_results = prev_query.all()
         
         prev_counts = {"present": 0, "late": 0, "absent": 0, "sick": 0, "permission": 0}
@@ -184,7 +257,7 @@ class DashboardRepository:
             "total_absents": counts["absent"] + counts["sick"] + counts["permission"]
         }
     
-    def get_risk_summary(self) -> dict:
+    def get_risk_summary(self, class_ids: Optional[List[str]] = None) -> dict:
         """
         Get summary of students by risk level.
         
@@ -192,26 +265,49 @@ class DashboardRepository:
         will be implemented in Phase 5 (EWS Enhancement).
         Currently returns estimated risk based on attendance patterns.
         
+        Args:
+            class_ids: Filter by class IDs (for teacher role)
+
         Returns:
             dict: Risk level counts
         """
         # Get active students count for low risk baseline
-        active_students = db.session.query(func.count(Student.nis)).filter(
+        active_students_query = db.session.query(func.count(Student.nis)).filter(
             Student.is_active == True
-        ).scalar() or 0
-        
+        )
+
+        if class_ids is not None:
+            if len(class_ids) == 0:
+                # Teacher has no classes
+                return {
+                    "high_risk": 0,
+                    "medium_risk": 0,
+                    "low_risk": 0
+                }
+            active_students_query = active_students_query.filter(Student.class_id.in_(class_ids))
+
+        active_students = active_students_query.scalar() or 0
+
         # Calculate risk based on last 30 days attendance
         thirty_days_ago = date.today() - timedelta(days=30)
         
         # Students with more than 3 absences in last 30 days = high risk
         high_risk_query = db.session.query(
-            func.count(func.distinct(AttendanceDaily.student_nis))
+            AttendanceDaily.student_nis,
+            func.count(AttendanceDaily.id).label('absence_count')
         ).filter(
             and_(
                 AttendanceDaily.attendance_date >= thirty_days_ago,
                 AttendanceDaily.status.in_(['Absent', 'Sick', 'Permission'])
             )
-        ).group_by(AttendanceDaily.student_nis).having(
+        )
+
+        # Add class filter if provided
+        if class_ids is not None and len(class_ids) > 0:
+            high_risk_query = high_risk_query.join(Student, AttendanceDaily.student_nis == Student.nis)
+            high_risk_query = high_risk_query.filter(Student.class_id.in_(class_ids))
+
+        high_risk_query = high_risk_query.group_by(AttendanceDaily.student_nis).having(
             func.count(AttendanceDaily.id) > 3
         )
         
@@ -219,13 +315,21 @@ class DashboardRepository:
         
         # Students with 1-3 absences = medium risk
         medium_risk_query = db.session.query(
-            func.count(func.distinct(AttendanceDaily.student_nis))
+            AttendanceDaily.student_nis,
+            func.count(AttendanceDaily.id).label('absence_count')
         ).filter(
             and_(
                 AttendanceDaily.attendance_date >= thirty_days_ago,
                 AttendanceDaily.status.in_(['Absent', 'Sick', 'Permission'])
             )
-        ).group_by(AttendanceDaily.student_nis).having(
+        )
+
+        # Add class filter if provided
+        if class_ids is not None and len(class_ids) > 0:
+            medium_risk_query = medium_risk_query.join(Student, AttendanceDaily.student_nis == Student.nis)
+            medium_risk_query = medium_risk_query.filter(Student.class_id.in_(class_ids))
+
+        medium_risk_query = medium_risk_query.group_by(AttendanceDaily.student_nis).having(
             and_(
                 func.count(AttendanceDaily.id) >= 1,
                 func.count(AttendanceDaily.id) <= 3

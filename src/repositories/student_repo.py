@@ -40,6 +40,7 @@ class StudentRepository:
     def get_all(
         self,
         class_id: Optional[str] = None,
+        class_ids: Optional[List[str]] = None,
         is_active: Optional[bool] = None,
         search: Optional[str] = None,
         sort_by: Optional[str] = None,
@@ -49,7 +50,8 @@ class StudentRepository:
         Get query for all students with optional filters.
         
         Args:
-            class_id: Filter by class ID
+            class_id: Filter by class ID (single)
+            class_ids: Filter by multiple class IDs (for teacher role)
             is_active: Filter by active status
             search: Search by name (partial match)
             sort_by: Field to sort by (name, nis, class_id)
@@ -63,7 +65,10 @@ class StudentRepository:
         # Apply filters
         if class_id:
             query = query.filter(Student.class_id == class_id)
-        
+        elif class_ids:
+            # Filter by multiple class IDs (for teacher role)
+            query = query.filter(Student.class_id.in_(class_ids))
+
         if is_active is not None:
             query = query.filter(Student.is_active == is_active)
         

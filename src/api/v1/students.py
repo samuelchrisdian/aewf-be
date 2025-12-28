@@ -37,6 +37,10 @@ def get_students(current_user):
     
     Returns:
         Paginated list of students
+
+    Note:
+        - Admin role: Returns all students
+        - Teacher role: Returns only students from classes where the teacher is wali kelas
     """
     # Get pagination params
     page, per_page = get_pagination_params(request.args)
@@ -55,7 +59,7 @@ def get_students(current_user):
         sort_by, order, ['name', 'nis', 'class_id']
     )
     
-    # Get students
+    # Get students with role-based filtering
     result = student_service.get_students(
         page=page,
         per_page=per_page,
@@ -63,7 +67,8 @@ def get_students(current_user):
         is_active=is_active,
         search=search,
         sort_by=sort_by,
-        order=order
+        order=order,
+        current_user=current_user
     )
     
     return paginated_response(

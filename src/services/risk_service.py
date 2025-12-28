@@ -4,12 +4,13 @@ Handles all business operations for risk management and EWS.
 Uses the new MLService for hybrid ML + Rule-based predictions.
 """
 
-from typing import Optional, List
+from typing import Optional, List, Any
 from datetime import date, datetime
 import logging
 
 from src.repositories.risk_repo import risk_repository
 from src.repositories.student_repo import student_repository
+from src.repositories.teacher_repo import teacher_repository
 from src.services.ml_service import MLService, get_tier_recommendations
 
 logger = logging.getLogger(__name__)
@@ -33,21 +34,38 @@ class RiskService:
         class_id: Optional[str] = None,
         page: int = 1,
         per_page: int = 20,
+        current_user: Optional[Any] = None
     ) -> tuple:
         """
-        Get list of at-risk students.
+        Get list of at-risk students with role-based filtering.
 
         Args:
             level: Filter by risk level
             class_id: Filter by class
             page: Page number
             per_page: Items per page
+            current_user: Current authenticated user (for role-based filtering)
 
         Returns:
             tuple: (students list, pagination dict)
         """
+        # Role-based filtering
+        class_ids = None
+        if current_user and current_user.role == 'Teacher':
+            # Get classes managed by this teacher (wali kelas)
+            teacher_classes = teacher_repository.get_classes_by_teacher(current_user.username)
+            if teacher_classes:
+                class_ids = [cls.class_id for cls in teacher_classes]
+            else:
+                # Teacher has no classes, return empty result
+                class_ids = []
+
         students, total = self.repository.get_at_risk_students(
-            level=level, class_id=class_id, page=page, per_page=per_page
+            level=level,
+            class_id=class_id,
+            class_ids=class_ids,
+            page=page,
+            per_page=per_page
         )
 
         import math

@@ -7,6 +7,7 @@ from marshmallow import ValidationError
 
 from src.repositories.student_repo import student_repository
 from src.repositories.class_repo import class_repository
+from src.repositories.teacher_repo import teacher_repository
 from src.schemas.student_schema import (
     student_create_schema,
     student_update_schema,
@@ -31,7 +32,8 @@ class StudentService:
         is_active: Optional[bool] = None,
         search: Optional[str] = None,
         sort_by: Optional[str] = None,
-        order: str = 'asc'
+        order: str = 'asc',
+        current_user: Optional[Any] = None
     ) -> dict:
         """
         Get paginated list of students with filters.
@@ -44,7 +46,8 @@ class StudentService:
             search: Search by name/NIS
             sort_by: Sort field
             order: Sort order
-            
+            current_user: Current authenticated user (for role-based filtering)
+
         Returns:
             dict: {
                 "data": [serialized students],
@@ -56,9 +59,21 @@ class StudentService:
         if sort_by and sort_by not in allowed_sort_fields:
             sort_by = 'name'
         
+        # Role-based filtering
+        class_ids = None
+        if current_user and current_user.role == 'Teacher':
+            # Get classes managed by this teacher (wali kelas)
+            teacher_classes = teacher_repository.get_classes_by_teacher(current_user.username)
+            if teacher_classes:
+                class_ids = [cls.class_id for cls in teacher_classes]
+            else:
+                # Teacher has no classes, return empty result
+                class_ids = []
+
         # Get query with filters
         query = self.repository.get_all(
             class_id=class_id,
+            class_ids=class_ids if class_ids is not None else None,
             is_active=is_active,
             search=search,
             sort_by=sort_by,

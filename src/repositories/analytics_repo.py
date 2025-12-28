@@ -17,16 +17,18 @@ class AnalyticsRepository:
         self,
         period: str = "weekly",
         start_date: Optional[date] = None,
-        end_date: Optional[date] = None
+        end_date: Optional[date] = None,
+        class_ids: Optional[List[str]] = None
     ) -> List[dict]:
         """
-        Get time-series attendance data.
-        
+        Get time-series attendance data with optional class filtering.
+
         Args:
             period: "weekly" or "monthly"
             start_date: Start of date range
             end_date: End of date range
-            
+            class_ids: Filter by class IDs (for teacher role)
+
         Returns:
             List of attendance data points for charting
         """
@@ -41,12 +43,17 @@ class AnalyticsRepository:
                 start_date = date(end_date.year - 1, end_date.month, 1)
         
         if period == "weekly":
-            return self._get_weekly_trends(start_date, end_date)
+            return self._get_weekly_trends(start_date, end_date, class_ids)
         else:
-            return self._get_monthly_trends(start_date, end_date)
-    
-    def _get_weekly_trends(self, start_date: date, end_date: date) -> List[dict]:
-        """Get weekly attendance trends."""
+            return self._get_monthly_trends(start_date, end_date, class_ids)
+
+    def _get_weekly_trends(
+        self,
+        start_date: date,
+        end_date: date,
+        class_ids: Optional[List[str]] = None
+    ) -> List[dict]:
+        """Get weekly attendance trends with optional class filtering."""
         trends = []
         
         current = start_date
@@ -64,8 +71,17 @@ class AnalyticsRepository:
                     AttendanceDaily.attendance_date >= current,
                     AttendanceDaily.attendance_date <= week_end
                 )
-            ).group_by(AttendanceDaily.status)
-            
+            )
+
+            # Apply class filter if provided
+            if class_ids is not None:
+                if len(class_ids) == 0:
+                    # Teacher has no classes, return empty
+                    return []
+                query = query.join(Student, AttendanceDaily.student_nis == Student.nis)
+                query = query.filter(Student.class_id.in_(class_ids))
+
+            query = query.group_by(AttendanceDaily.status)
             results = query.all()
             
             counts = {"present": 0, "late": 0, "absent": 0, "sick": 0, "permission": 0}
@@ -95,8 +111,13 @@ class AnalyticsRepository:
         
         return trends
     
-    def _get_monthly_trends(self, start_date: date, end_date: date) -> List[dict]:
-        """Get monthly attendance trends."""
+    def _get_monthly_trends(
+        self,
+        start_date: date,
+        end_date: date,
+        class_ids: Optional[List[str]] = None
+    ) -> List[dict]:
+        """Get monthly attendance trends with optional class filtering."""
         trends = []
         
         current_year = start_date.year
@@ -119,8 +140,17 @@ class AnalyticsRepository:
                     AttendanceDaily.attendance_date >= month_start,
                     AttendanceDaily.attendance_date <= month_end
                 )
-            ).group_by(AttendanceDaily.status)
-            
+            )
+
+            # Apply class filter if provided
+            if class_ids is not None:
+                if len(class_ids) == 0:
+                    # Teacher has no classes, return empty
+                    return []
+                query = query.join(Student, AttendanceDaily.student_nis == Student.nis)
+                query = query.filter(Student.class_id.in_(class_ids))
+
+            query = query.group_by(AttendanceDaily.status)
             results = query.all()
             
             counts = {"present": 0, "late": 0, "absent": 0, "sick": 0, "permission": 0}
@@ -155,14 +185,16 @@ class AnalyticsRepository:
     
     def get_class_comparison(
         self,
-        period: Optional[str] = None
+        period: Optional[str] = None,
+        class_ids: Optional[List[str]] = None
     ) -> List[dict]:
         """
-        Get per-class attendance statistics.
-        
+        Get per-class attendance statistics with optional filtering.
+
         Args:
             period: Month period (YYYY-MM), defaults to current month
-            
+            class_ids: Filter by class IDs (for teacher role)
+
         Returns:
             List of class statistics
         """
@@ -180,9 +212,16 @@ class AnalyticsRepository:
         start_date = date(year, month, 1)
         end_date = date(year, month, monthrange(year, month)[1])
         
-        # Get all classes with their attendance stats
-        classes = db.session.query(Class).all()
-        
+        # Get classes based on filter
+        if class_ids is not None:
+            if len(class_ids) == 0:
+                # Teacher has no classes
+                return []
+            classes = db.session.query(Class).filter(Class.class_id.in_(class_ids)).all()
+        else:
+            # Admin gets all classes
+            classes = db.session.query(Class).all()
+
         result = []
         for cls in classes:
             # Get students in this class

@@ -34,6 +34,10 @@ def get_daily_attendance(current_user):
         - page: Page number (default: 1)
         - per_page: Items per page (default: 20, max: 100)
     
+    Note:
+        - Admin role: Returns all attendance records
+        - Teacher role: Returns only records from their classes
+
     Returns:
         Paginated list of attendance records with student info
     """
@@ -47,7 +51,7 @@ def get_daily_attendance(current_user):
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
     
-    # Get attendance records
+    # Get attendance records with role-based filtering
     result = attendance_service.get_daily_attendance(
         page=page,
         per_page=per_page,
@@ -55,7 +59,8 @@ def get_daily_attendance(current_user):
         class_id=class_id,
         status=status,
         start_date=start_date,
-        end_date=end_date
+        end_date=end_date,
+        current_user=current_user
     )
     
     return paginated_response(

@@ -24,11 +24,15 @@ def get_classes(current_user):
     """
     Get list of all classes with student count.
     
+    Note:
+        - Admin role: Returns all classes
+        - Teacher role: Returns only their classes (as wali kelas)
+
     Returns:
         List of classes with wali kelas info and student count
     """
-    classes_data = class_service.get_classes()
-    
+    classes_data = class_service.get_classes(current_user=current_user)
+
     return success_response(
         data=classes_data,
         message="Classes retrieved successfully"

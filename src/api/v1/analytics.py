@@ -27,6 +27,10 @@ def get_trends(current_user):
         - start_date: Start of date range (YYYY-MM-DD)
         - end_date: End of date range (YYYY-MM-DD)
     
+    Note:
+        - Admin role: Returns trends for all students
+        - Teacher role: Returns trends only for their classes
+
     Returns:
         Time-series attendance data for charting
     """
@@ -44,7 +48,8 @@ def get_trends(current_user):
     trends = analytics_service.get_trends(
         period=period,
         start_date=start_date,
-        end_date=end_date
+        end_date=end_date,
+        current_user=current_user
     )
     
     return success_response(
@@ -62,13 +67,20 @@ def get_class_comparison(current_user):
     Query Parameters:
         - period: Month period (YYYY-MM), defaults to current month
     
+    Note:
+        - Admin role: Returns comparison for all classes
+        - Teacher role: Returns comparison only for their classes
+
     Returns:
         Class-by-class attendance statistics sorted by performance
     """
     period = request.args.get('period')
     
-    comparison = analytics_service.get_class_comparison(period=period)
-    
+    comparison = analytics_service.get_class_comparison(
+        period=period,
+        current_user=current_user
+    )
+
     return success_response(
         data=comparison,
         message="Class comparison retrieved successfully"

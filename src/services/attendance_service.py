@@ -2,7 +2,7 @@
 Attendance service for business logic.
 Handles all business operations for attendance management.
 """
-from typing import Optional, Tuple, List
+from typing import Optional, Tuple, List, Any
 from datetime import date, datetime
 from calendar import monthrange
 from marshmallow import ValidationError
@@ -31,11 +31,12 @@ class AttendanceService:
         class_id: Optional[str] = None,
         status: Optional[str] = None,
         start_date: Optional[str] = None,
-        end_date: Optional[str] = None
+        end_date: Optional[str] = None,
+        current_user: Optional[Any] = None
     ) -> dict:
         """
-        Get paginated list of daily attendance with filters.
-        
+        Get paginated list of daily attendance with filters and role-based filtering.
+
         Args:
             page: Page number
             per_page: Items per page
@@ -44,7 +45,8 @@ class AttendanceService:
             status: Filter by status
             start_date: Start of date range
             end_date: End of date range
-            
+            current_user: Current authenticated user (for role-based filtering)
+
         Returns:
             dict: Paginated attendance data
         """
@@ -53,10 +55,22 @@ class AttendanceService:
         parsed_start = self._parse_date(start_date)
         parsed_end = self._parse_date(end_date)
         
+        # Role-based filtering
+        class_ids = None
+        if current_user and current_user.role == 'Teacher':
+            # Get classes managed by this teacher (wali kelas)
+            teacher_classes = teacher_repository.get_classes_by_teacher(current_user.username)
+            if teacher_classes:
+                class_ids = [cls.class_id for cls in teacher_classes]
+            else:
+                # Teacher has no classes, return empty result
+                class_ids = []
+
         # Get query with filters
         query = self.repository.get_daily(
             attendance_date=parsed_date,
             class_id=class_id,
+            class_ids=class_ids,
             status=status,
             start_date=parsed_start,
             end_date=parsed_end

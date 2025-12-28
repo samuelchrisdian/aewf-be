@@ -68,6 +68,36 @@ class ClassRepository:
             for cls, count in results
         ]
     
+    def get_by_ids_with_student_count(self, class_ids: List[str]) -> List[dict]:
+        """
+        Get specific classes by IDs with student count (for teacher role).
+
+        Args:
+            class_ids: List of class IDs to retrieve
+
+        Returns:
+            List of dicts with class info and student count
+        """
+        if not class_ids:
+            return []
+
+        results = db.session.query(
+            Class,
+            func.count(Student.nis).filter(Student.is_active == True).label('student_count')
+        ).outerjoin(
+            Student, Class.class_id == Student.class_id
+        ).filter(
+            Class.class_id.in_(class_ids)
+        ).group_by(Class.class_id).order_by(Class.class_name.asc()).all()
+
+        return [
+            {
+                "class": cls,
+                "student_count": count or 0
+            }
+            for cls, count in results
+        ]
+
     def create(self, class_data: dict) -> Class:
         """
         Create a new class.
