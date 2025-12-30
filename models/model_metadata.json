@@ -1,6 +1,7 @@
 {
-  "trained_at": "2025-12-26T12:40:34.766128",
+  "trained_at": "2025-12-30T20:00:38.589610",
   "model_type": "LogisticRegression",
+  "explainer_type": "DecisionTree",
   "threshold": 0.5,
   "feature_columns": [
     "absent_count",
@@ -79,6 +80,10 @@
       "abs_importance": 0.0
     }
   ],
+  "explainer_config": {
+    "max_depth": 4,
+    "min_samples_leaf": 5
+  },
   "config": {
     "target_recall": 0.7,
     "target_f1": 0.65,
