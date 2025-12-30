@@ -34,7 +34,7 @@ class RiskService:
         class_id: Optional[str] = None,
         page: int = 1,
         per_page: int = 20,
-        current_user: Optional[Any] = None
+        current_user: Optional[Any] = None,
     ) -> tuple:
         """
         Get list of at-risk students with role-based filtering.
@@ -51,9 +51,11 @@ class RiskService:
         """
         # Role-based filtering
         class_ids = None
-        if current_user and current_user.role == 'Teacher':
+        if current_user and current_user.role == "Teacher":
             # Get classes managed by this teacher (wali kelas)
-            teacher_classes = teacher_repository.get_classes_by_teacher(current_user.username)
+            teacher_classes = teacher_repository.get_classes_by_teacher(
+                current_user.username
+            )
             if teacher_classes:
                 class_ids = [cls.class_id for cls in teacher_classes]
             else:
@@ -65,7 +67,7 @@ class RiskService:
             class_id=class_id,
             class_ids=class_ids,
             page=page,
-            per_page=per_page
+            per_page=per_page,
         )
 
         import math
@@ -269,6 +271,10 @@ class RiskService:
 
                 if ml_result.get("rule_reason"):
                     factors["rule_reason"] = ml_result.get("rule_reason")
+
+                # Add explanation_text from ML interpretation
+                if ml_result.get("explanation_text"):
+                    factors["explanation_text"] = ml_result.get("explanation_text")
 
                 # Save to history
                 self.repository.save_risk_history(

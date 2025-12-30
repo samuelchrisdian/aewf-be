@@ -194,7 +194,7 @@ be-flask/
 | `student_nis` | String | FK (`students.nis`) | Student ID |
 | `risk_level` | String | Not Null | Risk Level (High, Medium, Low) |
 | `risk_score` | Integer | Not Null | Score (0-100) |
-| `factors` | JSON | Nullable | Contributing factors |
+| `factors` | JSON | Nullable | Contributing factors (includes `explanation_text`) |
 | `calculated_at`| DateTime | Not Null | Calculation time |
 
 ### `notifications`
@@ -539,6 +539,7 @@ Logika Deteksi (Aturan):
 - Analyzes Logistic Regression coefficients to identify top 3 contributing factors
 - Extracts Decision Tree decision path to show IF-THEN rules
 - Translates technical feature names to readable Indonesian
+- **Saved to `risk_history.factors` JSON** for historical tracking
 
 For detailed ML documentation, see [ML_FLOW_GUIDE.md](./ML_FLOW_GUIDE.md).
 

@@ -33,6 +33,18 @@ Sistem ML EWS bertujuan untuk:
            ▼                          ▼                          ▼                          ▼
      Feature DataFrame          models/ews_model.pkl        Risk Prediction          Indonesian Text
                                models/ews_explainer_tree.pkl (RED/YELLOW/GREEN)       (explanation_text)
+                                                                    │                          │
+                                                                    └────────────┬─────────────┘
+                                                                                 ▼
+                                                                    ┌─────────────────────────┐
+                                                                    │  5. PERSISTENCE         │
+                                                                    │  (Save to risk_history) │
+                                                                    └─────────────────────────┘
+                                                                       src/services/risk_service.py
+                                                                                 │
+                                                                                 ▼
+                                                                    risk_history.factors JSON
+                                                                    (includes explanation_text)
 ```
 
 ---
@@ -552,6 +564,11 @@ Karena `absent_count` sekarang termasuk **inferred absences**:
 | Validasi Metrics | Setelah training | Pastikan Recall ≥ 0.70 |
 
 ---
+
+### v1.3 (2025-12-30)
+- ✅ **`explanation_text` now saved to `risk_history.factors` JSON**
+- ✅ Interpretation persisted for historical tracking and auditing
+- ✅ Indonesian natural language explanation available in risk history API
 
 ### v1.2 (2025-12-26)
 - ✅ Added **Explainability Module** (`src/ml/interpretation.py`)
