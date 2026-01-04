@@ -185,6 +185,197 @@ class MasterDataService:
             raise e
 
     @staticmethod
+    def preview_from_excel(file_path: str) -> dict:
+        """
+        Preview master data dari file Excel tanpa menyimpan ke database.
+
+        Returns:
+            dict dengan keys 'classes', 'students', 'teachers', 'summary', 'errors'
+        """
+        results = {
+            "classes": [],
+            "students": [],
+            "teachers": [],
+            "summary": {
+                "total_classes": 0,
+                "total_students": 0,
+                "total_teachers": 0,
+                "new_classes": 0,
+                "new_students": 0,
+                "new_teachers": 0,
+            },
+            "errors": [],
+        }
+
+        try:
+            xls = pd.ExcelFile(file_path)
+
+            for sheet_name in xls.sheet_names:
+                try:
+                    MasterDataService._preview_excel_sheet(xls, sheet_name, results)
+                except Exception as sheet_err:
+                    results["errors"].append(f"Sheet {sheet_name}: {str(sheet_err)}")
+
+            return results
+
+        except Exception as e:
+            results["errors"].append(str(e))
+            return results
+
+    @staticmethod
+    def _preview_excel_sheet(excel_file, sheet_name, results):
+        """
+        Preview a single Excel sheet that may contain MULTIPLE classes.
+        Does not modify database.
+        """
+        full_df = pd.read_excel(
+            excel_file, sheet_name=sheet_name, header=None, dtype=str
+        )
+
+        # Find all class section starts
+        class_start_rows = []
+        for idx, row in full_df.iterrows():
+            row_str = " ".join([str(x) for x in row.values if pd.notna(x)])
+            if re.search(r"Kls\s*/?\s*Smt|Kelas\s*/?\s*Smt", row_str, re.IGNORECASE):
+                class_start_rows.append(idx)
+
+        if not class_start_rows:
+            class_start_rows = [0]
+
+        # Process each class section
+        for i, start_row in enumerate(class_start_rows):
+            end_row = (
+                class_start_rows[i + 1]
+                if i + 1 < len(class_start_rows)
+                else len(full_df)
+            )
+
+            class_df = full_df.iloc[start_row:end_row].reset_index(drop=True)
+
+            try:
+                MasterDataService._preview_single_class(class_df, results)
+            except Exception as e:
+                results["errors"].append(
+                    f"Sheet {sheet_name} Row {start_row}: {str(e)}"
+                )
+
+    @staticmethod
+    def _preview_single_class(class_df, results):
+        """
+        Preview a single class section from the dataframe.
+        Does not modify database.
+        """
+        class_name = None
+        teacher_name = None
+        header_idx = None
+
+        # Extract metadata from first rows
+        for idx in range(min(10, len(class_df))):
+            row = class_df.iloc[idx]
+            row_str = " ".join([str(x) for x in row.values if pd.notna(x)])
+
+            # Find class name: "7 ( Tujuh ) - A" -> "7A"
+            if not class_name:
+                match = re.search(
+                    r"(\d+)\s*\([^)]*\)\s*[-]?\s*([A-Z])", row_str, re.IGNORECASE
+                )
+                if match:
+                    grade = match.group(1)
+                    section = match.group(2).upper()
+                    class_name = f"{grade}{section}"
+
+            # Find teacher name
+            if not teacher_name:
+                match = re.search(r"Wali\s+Kelas\s*:?\s*(.+)", row_str, re.IGNORECASE)
+                if match:
+                    teacher_name = match.group(1).strip().strip('"').strip(":").strip()
+
+            # Find table header (NO. INDUK)
+            if header_idx is None:
+                row_vals = [str(x).upper() for x in row.values]
+                if any("NO. INDUK" in s or "NO INDUK" in s for s in row_vals):
+                    header_idx = idx
+
+        if not class_name:
+            raise ValueError("Nama kelas tidak ditemukan (format: '7 ( Tujuh ) - A')")
+
+        if header_idx is None:
+            raise ValueError("Header tabel (NO. INDUK) tidak ditemukan")
+
+        # Check if teacher exists
+        teacher_id = None
+        if teacher_name:
+            simple_name = teacher_name.split(",")[0]
+            teacher_id = "T_" + re.sub(r"[^A-Z]", "", simple_name.upper())[:10]
+
+            existing_teacher = Teacher.query.get(teacher_id)
+            teacher_status = "exists" if existing_teacher else "new"
+
+            # Add teacher to preview if not already added
+            if not any(t["teacher_id"] == teacher_id for t in results["teachers"]):
+                results["teachers"].append(
+                    {
+                        "teacher_id": teacher_id,
+                        "name": teacher_name,
+                        "status": teacher_status,
+                    }
+                )
+                results["summary"]["total_teachers"] += 1
+                if teacher_status == "new":
+                    results["summary"]["new_teachers"] += 1
+
+        # Check if class exists
+        existing_class = Class.query.get(class_name)
+        class_status = "exists" if existing_class else "new"
+
+        results["classes"].append(
+            {
+                "class_id": class_name,
+                "class_name": class_name,
+                "teacher_name": teacher_name,
+                "status": class_status,
+            }
+        )
+        results["summary"]["total_classes"] += 1
+        if class_status == "new":
+            results["summary"]["new_classes"] += 1
+
+        # Parse student rows
+        student_rows = class_df.iloc[header_idx + 1 :]
+
+        for _, row in student_rows.iterrows():
+            if len(row) < 3:
+                continue
+
+            raw_nis = row.iloc[1]
+            raw_name = row.iloc[2]
+
+            if pd.isna(raw_nis) or pd.isna(raw_name):
+                continue
+
+            nis = str(raw_nis).replace(".0", "").strip()
+            name = str(raw_name).strip()
+
+            if not nis or not nis.isdigit():
+                continue
+
+            # Check if student exists
+            existing_student = Student.query.get(nis)
+            student_status = "exists" if existing_student else "new"
+
+            results["students"].append(
+                {
+                    "nis": nis,
+                    "name": name,
+                    "class_id": class_name,
+                    "status": student_status,
+                }
+            )
+            results["summary"]["total_students"] += 1
+            if student_status == "new":
+                results["summary"]["new_students"] += 1
+
+    @staticmethod
     def _process_excel_sheet(excel_file, sheet_name, results):
         """
         Process a single Excel sheet that may contain MULTIPLE classes.

@@ -56,11 +56,23 @@ result = MasterDataService.import_from_csv("path/to/Kelas7A.csv")
 
 ### API Endpoint
 ```http
-POST /api/v1/import/master-data
+POST /api/v1/import/master
 Content-Type: multipart/form-data
 
 file: <file>
 ```
+
+### Preview API Endpoint
+Sebelum import, gunakan endpoint preview untuk melihat data yang akan di-import:
+```http
+POST /api/v1/import/master/preview
+Content-Type: multipart/form-data
+
+file: <file>
+```
+**Response:** `{classes: [...], students: [...], teachers: [...], summary: {...}, errors: [...]}`
+
+Setiap item memiliki field `status` yang menunjukkan apakah data tersebut `new` atau sudah `exists` di database.
 
 ---
 
@@ -97,11 +109,23 @@ User dari department lain (GTT, GTY, OB, dll) akan di-skip untuk menghindari dat
 
 ### API Endpoint
 ```http
-POST /api/v1/machines/{machine_code}/sync
+POST /api/v1/import/users-sync
 Content-Type: multipart/form-data
 
 file: <file>
+machine_code: MACHINE_01
 ```
+
+### Preview API Endpoint
+Sebelum sync, gunakan endpoint preview untuk melihat user yang akan di-import:
+```http
+POST /api/v1/import/users-sync/preview
+Content-Type: multipart/form-data
+
+file: <file>
+machine_code: MACHINE_01
+```
+**Response:** `{users: [...], summary: {total_users, new_users, existing_users, skipped_non_smp}, errors: [...]}`
 
 ---
 
@@ -228,12 +252,23 @@ User dari department lain (GTT, GTY, OB, dll) akan di-skip.
 
 ### API Endpoint
 ```http
-POST /api/v1/import/attendance-logs
+POST /api/v1/import/attendance
 Content-Type: multipart/form-data
 
 file: <file>
 machine_code: MACHINE_01
 ```
+
+### Preview API Endpoint
+Sebelum import, gunakan endpoint preview untuk melihat data yang akan di-import:
+```http
+POST /api/v1/import/attendance/preview
+Content-Type: multipart/form-data
+
+file: <file>
+machine_code: MACHINE_01
+```
+**Response:** `{format: "matrix|flat", period: {year, month}, users: [...], summary: {total_logs, total_users, users_not_found, unmapped_users}, errors: [...]}`
 
 ---
 

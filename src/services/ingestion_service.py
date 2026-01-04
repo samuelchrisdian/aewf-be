@@ -124,6 +124,239 @@ class IngestionService:
             raise e
 
     @staticmethod
+    def preview_logs_from_excel(file_path: str, machine_code: str) -> dict:
+        """
+        Preview attendance logs from Excel file without saving to database.
+
+        Returns:
+            dict with keys 'format', 'period', 'users', 'summary', 'errors'
+        """
+        results = {
+            "format": None,
+            "period": {"year": None, "month": None},
+            "users": [],
+            "summary": {
+                "total_logs": 0,
+                "total_users": 0,
+                "users_not_found": 0,
+                "unmapped_users": 0,
+            },
+            "errors": [],
+        }
+
+        try:
+            # Check Machine exists
+            machine = Machine.query.filter_by(machine_code=machine_code).first()
+            if not machine:
+                results["errors"].append(
+                    f"Machine '{machine_code}' not found. Please register the machine first."
+                )
+                return results
+
+            # Read file
+            if file_path.lower().endswith(".csv"):
+                df_raw = pd.read_csv(file_path, header=None, dtype=str)
+            else:
+                xl = pd.ExcelFile(file_path)
+                log_sheet = next(
+                    (s for s in xl.sheet_names if "log" in s.lower()), xl.sheet_names[0]
+                )
+                df_raw = pd.read_excel(
+                    file_path, sheet_name=log_sheet, header=None, dtype=str
+                )
+
+            # Detect format
+            is_matrix = IngestionService._detect_matrix_format(df_raw)
+            results["format"] = "matrix" if is_matrix else "flat"
+
+            if is_matrix:
+                IngestionService._preview_matrix_format(df_raw, machine, results)
+            else:
+                IngestionService._preview_flat_format(file_path, machine, results)
+
+            return results
+
+        except Exception as e:
+            results["errors"].append(str(e))
+            return results
+
+    @staticmethod
+    def _preview_matrix_format(df: pd.DataFrame, machine, results: dict):
+        """
+        Preview matrix format attendance data without saving to database.
+        """
+        # Extract period
+        year, month = IngestionService._extract_period_from_report(df)
+        results["period"]["year"] = year
+        results["period"]["month"] = month
+
+        # Find day column mapping
+        day_map = IngestionService._find_day_column_mapping(df, None)
+        if not day_map:
+            results["errors"].append("Could not find day column mapping.")
+            return
+
+        # Collect user statistics
+        user_stats = {}  # {user_id: {"name": ..., "log_count": 0, "mapped_to": ...}}
+
+        current_user_id = None
+        current_user_info = None
+
+        for row_idx in range(len(df)):
+            row = df.iloc[row_idx]
+            first_cell = str(row.iloc[0]).strip() if pd.notna(row.iloc[0]) else ""
+
+            if first_cell.upper().startswith("ID:"):
+                user_info = IngestionService._parse_user_block_header(row)
+                current_user_id = user_info["user_id"]
+                current_user_info = user_info
+
+                if not current_user_id:
+                    continue
+
+                # Filter SMP only
+                department = user_info.get("department", "").upper()
+                if department and department != "SMP":
+                    current_user_id = None
+                    continue
+
+                # Initialize user stats
+                if current_user_id not in user_stats:
+                    # Check if user exists in machine
+                    m_user = MachineUser.query.filter_by(
+                        machine_id=machine.id, machine_user_id=current_user_id
+                    ).first()
+
+                    mapped_to = None
+                    if m_user:
+                        mapping = StudentMachineMap.query.filter_by(
+                            machine_user_id_fk=m_user.id
+                        ).first()
+                        if mapping:
+                            mapped_to = mapping.student_nis
+
+                    user_stats[current_user_id] = {
+                        "user_id": current_user_id,
+                        "name": user_info.get("user_name", "Unknown"),
+                        "log_count": 0,
+                        "found_in_machine": m_user is not None,
+                        "mapped_to": mapped_to,
+                    }
+                continue
+
+            # Count logs for current user
+            if current_user_id and current_user_id in user_stats:
+                for col_idx, day in day_map.items():
+                    if col_idx >= len(row):
+                        continue
+                    cell_value = row.iloc[col_idx]
+                    times = IngestionService._extract_times_from_cell(cell_value)
+                    user_stats[current_user_id]["log_count"] += len(times)
+                    results["summary"]["total_logs"] += len(times)
+
+        # Build user list and summary
+        for uid, stats in user_stats.items():
+            results["users"].append(stats)
+            results["summary"]["total_users"] += 1
+            if not stats["found_in_machine"]:
+                results["summary"]["users_not_found"] += 1
+            elif not stats["mapped_to"]:
+                results["summary"]["unmapped_users"] += 1
+
+    @staticmethod
+    def _preview_flat_format(file_path: str, machine, results: dict):
+        """
+        Preview flat format attendance data without saving to database.
+        """
+        # Determine file type
+        if file_path.lower().endswith(".csv"):
+            df_preview = pd.read_csv(file_path, header=None, nrows=20)
+        else:
+            xl = pd.ExcelFile(file_path)
+            log_sheet = next(
+                (s for s in xl.sheet_names if "log" in s.lower()), xl.sheet_names[0]
+            )
+            df_preview = pd.read_excel(
+                file_path, sheet_name=log_sheet, header=None, nrows=20
+            )
+
+        # Find header row
+        header_row_idx = None
+        for idx, row in df_preview.iterrows():
+            row_val = [str(x).lower().strip() for x in row.values if pd.notna(x)]
+            if "id" in row_val and any(
+                x in row_val for x in ["time", "datetime", "waktu"]
+            ):
+                header_row_idx = idx
+                break
+
+        if header_row_idx is None:
+            results["errors"].append(
+                "Could not find table header (ID, Time) in Log sheet."
+            )
+            return
+
+        # Read full data
+        if file_path.lower().endswith(".csv"):
+            df = pd.read_csv(file_path, header=header_row_idx)
+        else:
+            df = pd.read_excel(file_path, sheet_name=log_sheet, header=header_row_idx)
+
+        df.columns = [str(c).strip() for c in df.columns]
+
+        id_col = next((c for c in df.columns if c.lower() == "id"), None)
+        time_col = next(
+            (c for c in df.columns if c.lower() in ["datetime", "time", "waktu"]), None
+        )
+
+        if not id_col or not time_col:
+            results["errors"].append("Missing ID or Time column in Log sheet.")
+            return
+
+        # Collect user statistics
+        user_stats = {}
+
+        for index, row in df.iterrows():
+            uid = row[id_col]
+            if pd.isna(uid):
+                continue
+
+            uid_str = str(int(uid)) if isinstance(uid, float) else str(uid)
+
+            if uid_str not in user_stats:
+                m_user = MachineUser.query.filter_by(
+                    machine_id=machine.id, machine_user_id=uid_str
+                ).first()
+
+                mapped_to = None
+                if m_user:
+                    mapping = StudentMachineMap.query.filter_by(
+                        machine_user_id_fk=m_user.id
+                    ).first()
+                    if mapping:
+                        mapped_to = mapping.student_nis
+
+                user_stats[uid_str] = {
+                    "user_id": uid_str,
+                    "name": m_user.machine_user_name if m_user else "Unknown",
+                    "log_count": 0,
+                    "found_in_machine": m_user is not None,
+                    "mapped_to": mapped_to,
+                }
+
+            user_stats[uid_str]["log_count"] += 1
+            results["summary"]["total_logs"] += 1
+
+        # Build user list
+        for uid, stats in user_stats.items():
+            results["users"].append(stats)
+            results["summary"]["total_users"] += 1
+            if not stats["found_in_machine"]:
+                results["summary"]["users_not_found"] += 1
+            elif not stats["mapped_to"]:
+                results["summary"]["unmapped_users"] += 1
+
+    @staticmethod
     def _detect_matrix_format(df: pd.DataFrame) -> bool:
         """
         Detects if the dataframe is in matrix format by looking for "ID:" pattern.

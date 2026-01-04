@@ -367,6 +367,146 @@ class MachineService:
             # Log error properly here
             raise e
 
+    @staticmethod
+    def preview_users_from_excel(file_path: str, machine_code: str) -> dict:
+        """
+        Preview machine users from Excel file without saving to database.
+
+        Returns:
+            dict with keys 'users', 'summary', 'errors'
+        """
+        results = {
+            "users": [],
+            "summary": {
+                "total_users": 0,
+                "new_users": 0,
+                "existing_users": 0,
+                "skipped_non_smp": 0,
+            },
+            "errors": [],
+        }
+
+        try:
+            # 1. Check if Machine Exists
+            machine = Machine.query.filter_by(machine_code=machine_code).first()
+            if not machine:
+                results["errors"].append(
+                    f"Machine '{machine_code}' not found. Please register the machine first."
+                )
+                return results
+
+            # 2. Find sheet containing "stat"
+            xl = pd.ExcelFile(file_path)
+            stat_sheet = next((s for s in xl.sheet_names if "stat" in s.lower()), None)
+
+            if not stat_sheet:
+                results["errors"].append(
+                    "No sheet found with 'stat' in name (e.g., 'Att. Stat.', 'Statistik')."
+                )
+                return results
+
+            # 3. Scan rows to find header
+            df_preview = pd.read_excel(
+                file_path, sheet_name=stat_sheet, header=None, nrows=20
+            )
+            header_row_idx = None
+
+            for idx, row in df_preview.iterrows():
+                row_val = [str(x).lower().strip() for x in row.values if pd.notna(x)]
+                if "id" in row_val and any(x in row_val for x in ["name", "nama"]):
+                    header_row_idx = idx
+                    break
+
+            if header_row_idx is None:
+                results["errors"].append(
+                    "Could not find table header (ID, Name/Nama) in Stat sheet."
+                )
+                return results
+
+            # 4. Parse data
+            df = pd.read_excel(
+                file_path, sheet_name=stat_sheet, header=header_row_idx, dtype=str
+            )
+            df.columns = [str(c).strip() for c in df.columns]
+
+            # Identify columns
+            id_col = next((c for c in df.columns if c.lower() == "id"), None)
+            name_col = next(
+                (c for c in df.columns if c.lower() in ["name", "nama"]), None
+            )
+            dept_col = next(
+                (
+                    c
+                    for c in df.columns
+                    if c.lower() in ["department", "departemen", "dept"]
+                ),
+                None,
+            )
+
+            if not id_col or not name_col:
+                results["errors"].append(
+                    f"Missing required columns in Stat sheet. Found: {df.columns.tolist()}"
+                )
+                return results
+
+            # 5. Cache existing users
+            existing_users = {
+                u.machine_user_id: u
+                for u in MachineUser.query.filter_by(machine_id=machine.id).all()
+            }
+
+            # 6. Process Users
+            for _, row in df.iterrows():
+                uid = row[id_col]
+                name = row[name_col]
+
+                if (
+                    pd.isna(uid)
+                    or pd.isna(name)
+                    or str(uid).lower() in ["id", "nan", "none"]
+                ):
+                    continue
+
+                uid_str = str(uid).strip().replace(".0", "")
+                name_clean = str(name).strip()
+                dept_clean = (
+                    str(row[dept_col]).strip()
+                    if dept_col and pd.notna(row[dept_col])
+                    else None
+                )
+
+                if not uid_str:
+                    continue
+
+                # Track non-SMP users separately but don't include in preview
+                if dept_clean and dept_clean.upper() != "SMP":
+                    results["summary"]["skipped_non_smp"] += 1
+                    continue
+
+                # Determine status
+                if uid_str in existing_users:
+                    user_status = "exists"
+                    results["summary"]["existing_users"] += 1
+                else:
+                    user_status = "new"
+                    results["summary"]["new_users"] += 1
+
+                results["users"].append(
+                    {
+                        "machine_user_id": uid_str,
+                        "name": name_clean,
+                        "department": dept_clean,
+                        "status": user_status,
+                    }
+                )
+                results["summary"]["total_users"] += 1
+
+            return results
+
+        except Exception as e:
+            results["errors"].append(str(e))
+            return results
+
 
 # Singleton instance
 machine_service = MachineService()

@@ -321,8 +321,12 @@ All endpoints are prefixed with `/api/v1` and require authentication token (Head
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `POST` | `/import/master` | Upload Master Data Excel (Students, Classes, Teachers). |
+| `POST` | `/import/master/preview` | Preview Master Data Excel before import. Returns classes, students, teachers with status (new/exists). |
 | `POST` | `/import/users-sync` | Upload Machine User export to sync machine users. Params: `machine_code` |
+| `POST` | `/import/users-sync/preview` | Preview Machine Users before sync. Params: `machine_code`. Returns users with status (new/exists). |
 | `POST` | `/import/attendance` | Upload Attendance Logs CSV/Excel. Params: `machine_code` |
+| `POST` | `/import/attendance/preview` | Preview Attendance Logs before import. Params: `machine_code`. Returns format, period, users, log counts. |
+
 
 ### 🖨️ Machine Management
 | Method | Endpoint | Description |
