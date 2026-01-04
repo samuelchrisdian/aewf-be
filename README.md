@@ -337,15 +337,18 @@ All endpoints are prefixed with `/api/v1` and require authentication token (Head
 | `PUT` | `/machines/<id>` | Update machine details. |
 | `DELETE` | `/machines/<id>` | Delete machine. |
 | `GET` | `/machines/<id>/users` | List users on a specific machine. |
+| `DELETE` | `/machines/<id>/users/<user_id>` | Delete a machine user. |
 
 ### 🔍 Fuzzy Mapping
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `GET` | `/mapping/unmapped` | List unmapped machine users with suggestions. |
+| `GET` | `/mapping/list` | Get paginated list of all mappings with filters (status, machine_id, class_id, search). |
 | `POST` | `/mapping/bulk-verify` | Bulk verify or reject mappings. |
 | `GET` | `/mapping/stats` | Get mapping statistics. |
 | `GET` | `/mapping/<id>` | Get mapping details. |
 | `DELETE` | `/mapping/<id>` | Delete a mapping. |
+| `DELETE` | `/mapping/student/<nis>` | Remove mapping for a student (unmap). |
 | `POST` | `/mapping/process` | Run auto-mapping engine (Legacy). |
 | `GET` | `/mapping/suggestions` | Get list of mapping suggestions (Legacy). |
 | `POST` | `/mapping/verify` | Verify or reject a mapping suggestion (Legacy). |

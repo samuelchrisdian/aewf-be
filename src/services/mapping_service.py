@@ -205,6 +205,61 @@ class MappingService:
 
         return self._serialize_mapping(mapping), None
 
+    def get_mappings_list(
+        self,
+        page: int = 1,
+        per_page: int = 20,
+        status: Optional[str] = None,
+        machine_id: Optional[int] = None,
+        class_id: Optional[str] = None,
+        search: Optional[str] = None,
+    ) -> dict:
+        """
+        Get paginated list of all mappings with details.
+
+        Args:
+            page: Page number
+            per_page: Items per page
+            status: Filter by status (verified, suggested, rejected)
+            machine_id: Filter by machine ID
+            class_id: Filter by student class ID
+            search: Search by student or machine user name
+
+        Returns:
+            dict: Paginated mappings with data and pagination info
+        """
+        query = self.repository.get_all_mappings(
+            status=status, machine_id=machine_id, class_id=class_id, search=search
+        )
+
+        result = paginate_query(query, page, per_page)
+
+        # Serialize mappings
+        mappings_data = []
+        for mapping in result["data"]:
+            mappings_data.append(self._serialize_mapping(mapping))
+
+        result["data"] = mappings_data
+        return result
+
+    def unmap_student(self, student_nis: str) -> Tuple[bool, Optional[str]]:
+        """
+        Remove mapping for a specific student.
+
+        Args:
+            student_nis: Student NIS
+
+        Returns:
+            Tuple of (success, error_message)
+        """
+        # Check if mapping exists
+        mapping = self.repository.get_by_student_nis(student_nis)
+        if not mapping:
+            return False, "Mapping not found for this student"
+
+        self.repository.delete_by_student_nis(student_nis)
+        return True, None
+
     def _serialize_unmapped_user(
         self, user: MachineUser, students: List[Student], max_suggestions: int = 3
     ) -> dict:

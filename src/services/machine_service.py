@@ -189,6 +189,36 @@ class MachineService:
         result["data"] = users_data
         return result, None
 
+    def delete_machine_user(
+        self, machine_id: int, user_id: int
+    ) -> Tuple[bool, Optional[str]]:
+        """
+        Delete a machine user.
+
+        Args:
+            machine_id: Machine ID (for validation)
+            user_id: Machine user ID
+
+        Returns:
+            Tuple of (success, error_message)
+        """
+        # Verify machine exists
+        machine = self.repository.get_by_id(machine_id)
+        if not machine:
+            return False, "Machine not found"
+
+        # Verify user exists and belongs to this machine
+        user = self.repository.get_machine_user_by_id(user_id)
+        if not user:
+            return False, "Machine user not found"
+
+        if user.machine_id != machine_id:
+            return False, "User does not belong to this machine"
+
+        # Delete the user (cascade deletes mappings and raw logs)
+        self.repository.delete_machine_user(user_id)
+        return True, None
+
     def _serialize_machine(self, machine: Machine, include_users: bool = False) -> dict:
         """Serialize a Machine object to dict."""
         data = {
