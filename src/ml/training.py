@@ -16,7 +16,7 @@ import numpy as np
 import pickle
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Tuple, Optional
 
 from sklearn.linear_model import LogisticRegression
@@ -293,7 +293,7 @@ def save_model_and_metadata(
 
     # Save metadata
     metadata = {
-        "trained_at": datetime.now().isoformat(),
+        "trained_at": datetime.now(timezone.utc).isoformat(),
         "model_type": "LogisticRegression",
         "explainer_type": "DecisionTree",
         "threshold": threshold,
