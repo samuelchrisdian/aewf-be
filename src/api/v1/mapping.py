@@ -36,7 +36,7 @@ def get_unmapped_users(current_user):
         Paginated list of unmapped users with suggested matches
     """
     # Get pagination params
-    page, per_page = get_pagination_params(request.args)
+    page, per_page, _ = get_pagination_params(request.args)
 
     # Get filter params
     machine_id = request.args.get("machine_id", type=int)
@@ -166,7 +166,7 @@ def get_mappings_list(current_user):
         Paginated list of mappings with machine user and student details
     """
     # Get pagination params
-    page, per_page = get_pagination_params(request.args)
+    page, per_page, _ = get_pagination_params(request.args)
 
     # Get filter params
     status = request.args.get("status")

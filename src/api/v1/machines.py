@@ -40,7 +40,7 @@ def get_machines(current_user):
         Paginated list of machines with user counts
     """
     # Get pagination params
-    page, per_page = get_pagination_params(request.args)
+    page, per_page, _ = get_pagination_params(request.args)
 
     # Get filter params
     status = request.args.get("status")
@@ -194,7 +194,7 @@ def get_machine_users(current_user, machine_id):
         Paginated list of machine users
     """
     # Get pagination params
-    page, per_page = get_pagination_params(request.args)
+    page, per_page, _ = get_pagination_params(request.args)
 
     # Get filter params
     search = request.args.get("search")
