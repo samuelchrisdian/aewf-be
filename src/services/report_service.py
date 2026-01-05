@@ -225,47 +225,355 @@ class ReportService:
         return report_data
 
     def _generate_attendance_excel(self, report_data: Dict[str, Any]) -> BytesIO:
-        """Generate Excel file for attendance report."""
+        """Generate Excel file for attendance report in matrix format."""
+        import calendar
+        from datetime import datetime as dt
+
         output = BytesIO()
         workbook = xlsxwriter.Workbook(output, {"in_memory": True})
-        worksheet = workbook.add_worksheet("Attendance Report")
+        worksheet = workbook.add_worksheet("Rekap Absensi")
 
-        # Add formats
+        # Parse period dates
+        start_date_str = report_data["period"].get("start_date")
+        end_date_str = report_data["period"].get("end_date")
+
+        if start_date_str:
+            start_dt = dt.strptime(start_date_str, "%Y-%m-%d")
+            year = start_dt.year
+            month = start_dt.month
+        else:
+            year = dt.now().year
+            month = dt.now().month
+
+        # Indonesian month names
+        month_names_id = {
+            1: "JANUARI",
+            2: "FEBRUARI",
+            3: "MARET",
+            4: "APRIL",
+            5: "MEI",
+            6: "JUNI",
+            7: "JULI",
+            8: "AGUSTUS",
+            9: "SEPTEMBER",
+            10: "OKTOBER",
+            11: "NOVEMBER",
+            12: "DESEMBER",
+        }
+        month_name = month_names_id.get(month, "")
+
+        # Get days in month
+        _, days_in_month = calendar.monthrange(year, month)
+
+        # Get class info
+        class_id = report_data["filters"].get("class_id")
+        class_obj = None
+        wali_kelas_name = ""
+        class_display_name = ""
+
+        if class_id:
+            class_obj = class_repository.get_by_id(class_id)
+            if class_obj:
+                class_display_name = class_obj.class_name
+                if class_obj.wali_kelas:
+                    wali_kelas_name = class_obj.wali_kelas.name
+
+        # Create formats
         title_format = workbook.add_format(
             {
                 "bold": True,
                 "font_size": 14,
-                "bg_color": "#4472C4",
+                "font_color": "red",
+                "align": "center",
+                "valign": "vcenter",
+            }
+        )
+
+        subtitle_format = workbook.add_format(
+            {
+                "bold": True,
+                "font_size": 12,
+                "font_color": "red",
+                "align": "center",
+                "valign": "vcenter",
+            }
+        )
+
+        year_format = workbook.add_format(
+            {"bold": True, "font_size": 11, "align": "center", "valign": "vcenter"}
+        )
+
+        class_info_format = workbook.add_format(
+            {"bold": True, "font_size": 10, "bg_color": "yellow"}
+        )
+
+        header_format = workbook.add_format(
+            {
+                "bold": True,
+                "border": 1,
+                "align": "center",
+                "valign": "vcenter",
+                "text_wrap": True,
+            }
+        )
+
+        date_header_format = workbook.add_format(
+            {
+                "bold": True,
+                "border": 1,
+                "align": "center",
+                "valign": "vcenter",
+                "font_size": 9,
+            }
+        )
+
+        weekend_header_format = workbook.add_format(
+            {
+                "bold": True,
+                "border": 1,
+                "align": "center",
+                "valign": "vcenter",
+                "font_size": 9,
+                "bg_color": "red",
                 "font_color": "white",
             }
         )
 
-        header_format = workbook.add_format(
-            {"bold": True, "bg_color": "#D9E1F2", "border": 1}
+        cell_format = workbook.add_format(
+            {"border": 1, "align": "center", "valign": "vcenter"}
         )
 
-        # Write title
-        worksheet.write("A1", "Attendance Report", title_format)
-
-        # Write period
-        row = 2
-        worksheet.write(row, 0, "Period:", header_format)
-        worksheet.write(
-            row,
-            1,
-            f"{report_data['period']['start_date']} to {report_data['period']['end_date']}",
+        cell_left_format = workbook.add_format(
+            {"border": 1, "align": "left", "valign": "vcenter"}
         )
 
-        # Write statistics
-        row += 2
-        worksheet.write(row, 0, "Statistics", title_format)
+        weekend_cell_format = workbook.add_format(
+            {"border": 1, "align": "center", "valign": "vcenter", "bg_color": "red"}
+        )
+
+        status_format = workbook.add_format(
+            {"border": 1, "align": "center", "valign": "vcenter", "font_size": 9}
+        )
+
+        summary_header_format = workbook.add_format(
+            {
+                "bold": True,
+                "border": 1,
+                "align": "center",
+                "valign": "vcenter",
+                "font_size": 8,
+            }
+        )
+
+        signature_format = workbook.add_format({"align": "left", "valign": "vcenter"})
+
+        underline_format = workbook.add_format({"underline": True, "bold": True})
+
+        # Current row counter
+        row = 0
+
+        # Get academic year
+        academic_year = f"{year}-{year + 1}" if month >= 7 else f"{year - 1}-{year}"
+
+        # Title section
+        title_col_end = 3 + days_in_month + 3  # NO, NO.INDUK, NAMA, days, S, I, A
+        worksheet.merge_range(
+            row, 0, row, title_col_end, "REKAP ABSENSI SISWA", title_format
+        )
         row += 1
 
-        stats = report_data["statistics"]
-        for key, value in stats.items():
-            worksheet.write(row, 0, key.replace("_", " ").title())
-            worksheet.write(row, 1, value)
+        worksheet.merge_range(
+            row,
+            0,
+            row,
+            title_col_end,
+            "SEKOLAH MENENGAH PERTAMA KRISTEN PELITA KASIH",
+            subtitle_format,
+        )
+        row += 1
+
+        worksheet.merge_range(
+            row, 0, row, title_col_end, f"TAHUN PELAJARAN {academic_year}", year_format
+        )
+        row += 2
+
+        # Class info
+        worksheet.write(row, 0, f"Kls / Smt", class_info_format)
+        worksheet.write(row, 1, f": {class_display_name} /", class_info_format)
+        row += 1
+
+        worksheet.write(row, 0, "Wali Kelas", class_info_format)
+        worksheet.write(row, 1, f": {wali_kelas_name}", class_info_format)
+        row += 2
+
+        # Table header row 1
+        header_row = row
+        worksheet.merge_range(header_row, 0, header_row + 1, 0, "NO.", header_format)
+        worksheet.merge_range(
+            header_row, 1, header_row + 1, 1, "NO.\nINDUK", header_format
+        )
+
+        # Month and NAMA header
+        worksheet.write(header_row, 2, f"BULAN : {month_name}", header_format)
+        worksheet.write(header_row + 1, 2, "NAMA", header_format)
+
+        # PADA TANGGAL header
+        worksheet.merge_range(
+            header_row,
+            3,
+            header_row,
+            3 + days_in_month - 1,
+            "PADA TANGGAL",
+            header_format,
+        )
+
+        # JUMLAH header
+        jumlah_start_col = 3 + days_in_month
+        worksheet.merge_range(
+            header_row,
+            jumlah_start_col,
+            header_row,
+            jumlah_start_col + 2,
+            "JUMLAH",
+            header_format,
+        )
+
+        # Date numbers (1-31) in second header row
+        for day in range(1, days_in_month + 1):
+            col = 2 + day
+            # Check if weekend
+            day_date = dt(year, month, day)
+            is_weekend = day_date.weekday() >= 5  # Saturday=5, Sunday=6
+
+            if is_weekend:
+                worksheet.write(header_row + 1, col, day, weekend_header_format)
+            else:
+                worksheet.write(header_row + 1, col, day, date_header_format)
+
+        # S, I, A headers
+        worksheet.write(header_row + 1, jumlah_start_col, "S", summary_header_format)
+        worksheet.write(
+            header_row + 1, jumlah_start_col + 1, "I", summary_header_format
+        )
+        worksheet.write(
+            header_row + 1, jumlah_start_col + 2, "A", summary_header_format
+        )
+
+        row = header_row + 2
+
+        # Get students for this class
+        students = []
+        if class_id:
+            students = student_repository.get_all(
+                class_id=class_id, is_active=True
+            ).all()
+
+        # Prepare start and end date for querying
+        period_start = dt(year, month, 1).date()
+        period_end = dt(year, month, days_in_month).date()
+
+        # Write student data
+        for idx, student in enumerate(students, start=1):
+            # Write NO
+            worksheet.write(row, 0, idx, cell_format)
+
+            # Write NO. INDUK
+            worksheet.write(row, 1, student.nis, cell_format)
+
+            # Write NAMA
+            worksheet.write(row, 2, student.name, cell_left_format)
+
+            # Get attendance records for this student
+            attendance_records = attendance_repository.get_by_student(
+                nis=student.nis, start_date=period_start, end_date=period_end
+            )
+
+            # Create a map of date -> status
+            attendance_map = {}
+            for record in attendance_records:
+                attendance_map[record.attendance_date.day] = record.status
+
+            # Counters for summary
+            sick_count = 0
+            permission_count = 0
+            absent_count = 0
+
+            # Write attendance for each day
+            for day in range(1, days_in_month + 1):
+                col = 2 + day
+                day_date = dt(year, month, day)
+                is_weekend = day_date.weekday() >= 5
+
+                status = attendance_map.get(day, "")
+                display_text = ""
+
+                # Map status to display text
+                if status:
+                    status_lower = status.lower()
+                    if status_lower == "sick":
+                        display_text = "s"
+                        sick_count += 1
+                    elif status_lower == "permission":
+                        display_text = "i"
+                        permission_count += 1
+                    elif status_lower == "absent":
+                        display_text = "a"
+                        absent_count += 1
+                    # Present and Late show nothing (as per screenshot)
+
+                if is_weekend:
+                    worksheet.write(row, col, display_text, weekend_cell_format)
+                else:
+                    worksheet.write(row, col, display_text, status_format)
+
+            # Write summary columns
+            worksheet.write(
+                row, jumlah_start_col, sick_count if sick_count > 0 else "", cell_format
+            )
+            worksheet.write(
+                row,
+                jumlah_start_col + 1,
+                permission_count if permission_count > 0 else "",
+                cell_format,
+            )
+            worksheet.write(
+                row,
+                jumlah_start_col + 2,
+                absent_count if absent_count > 0 else "",
+                cell_format,
+            )
+
             row += 1
+
+        # Add some empty rows
+        row += 3
+
+        # Signature section
+        # Left side - Kepala Sekolah
+        worksheet.write(row, 0, "Mengetahui,", signature_format)
+        row += 1
+        worksheet.write(row, 0, "Kepala Sekolah", signature_format)
+
+        # Right side - Guru
+        city_name = "Lawang"  # Default city
+        worksheet.write(
+            row - 1, jumlah_start_col - 5, f"{city_name},", signature_format
+        )
+        worksheet.write(row, jumlah_start_col - 5, "Guru", signature_format)
+
+        row += 4
+
+        # Signature lines (underlined names)
+        worksheet.write(row, 0, "Herawati Dewiani, S.Pd, M.M", underline_format)
+
+        # Set column widths
+        worksheet.set_column(0, 0, 4)  # NO
+        worksheet.set_column(1, 1, 8)  # NO. INDUK
+        worksheet.set_column(2, 2, 30)  # NAMA
+        worksheet.set_column(3, 2 + days_in_month, 3)  # Date columns
+        worksheet.set_column(
+            jumlah_start_col, jumlah_start_col + 2, 3
+        )  # S, I, A columns
 
         workbook.close()
         output.seek(0)
