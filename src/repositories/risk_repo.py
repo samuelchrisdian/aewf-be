@@ -517,6 +517,117 @@ class RiskRepository:
         finally:
             session.close()
 
+    def get_actioned_alerts(
+        self,
+        class_id: Optional[str] = None,
+        action_type: Optional[str] = None,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        page: int = 1,
+        per_page: int = 20,
+    ) -> tuple:
+        """
+        Get list of alerts that have been actioned (acknowledged or resolved).
+
+        Args:
+            class_id: Filter by class
+            action_type: Filter by action taken
+            start_date: Filter alerts actioned from this date
+            end_date: Filter alerts actioned until this date
+            page: Page number
+            per_page: Items per page
+
+        Returns:
+            tuple: (list of actioned alerts, total count)
+        """
+        session = SessionLocal()
+        try:
+            query = (
+                session.query(
+                    RiskAlert,
+                    Student.name.label("student_name"),
+                    Student.class_id,
+                    Class.class_name,
+                    Teacher.name.label("assignee_name"),
+                )
+                .join(Student, RiskAlert.student_nis == Student.nis)
+                .outerjoin(Class, Student.class_id == Class.class_id)
+                .outerjoin(Teacher, RiskAlert.assigned_to == Teacher.teacher_id)
+            )
+
+            # Only include actioned alerts (not pending)
+            query = query.filter(RiskAlert.status.in_(["acknowledged", "resolved"]))
+
+            # Apply filters
+            if class_id:
+                query = query.filter(Student.class_id == class_id)
+            if action_type:
+                query = query.filter(RiskAlert.action_taken == action_type)
+            if start_date:
+                query = query.filter(
+                    RiskAlert.created_at
+                    >= datetime.combine(start_date, datetime.min.time())
+                )
+            if end_date:
+                query = query.filter(
+                    RiskAlert.created_at
+                    <= datetime.combine(end_date, datetime.max.time())
+                )
+
+            # Order by resolved_at (if resolved) or created_at descending
+            query = query.order_by(
+                desc(func.coalesce(RiskAlert.resolved_at, RiskAlert.created_at))
+            )
+
+            # Get total count
+            total = query.count()
+
+            # Paginate
+            offset = (page - 1) * per_page
+            results = query.offset(offset).limit(per_page).all()
+
+            # Format results
+            alerts = []
+            for (
+                alert,
+                student_name,
+                student_class_id,
+                class_name,
+                assignee_name,
+            ) in results:
+                alerts.append(
+                    {
+                        "id": alert.id,
+                        "student_nis": alert.student_nis,
+                        "student_name": student_name,
+                        "class_id": student_class_id,
+                        "class_name": class_name,
+                        "alert_type": alert.alert_type,
+                        "message": alert.message,
+                        "created_at": (
+                            alert.created_at.isoformat() if alert.created_at else None
+                        ),
+                        "status": alert.status,
+                        "assigned_to": alert.assigned_to,
+                        "assignee_name": assignee_name,
+                        "action_taken": alert.action_taken,
+                        "action_notes": alert.action_notes,
+                        "follow_up_date": (
+                            alert.follow_up_date.isoformat()
+                            if alert.follow_up_date
+                            else None
+                        ),
+                        "resolved_at": (
+                            alert.resolved_at.isoformat() if alert.resolved_at else None
+                        ),
+                    }
+                )
+
+            return alerts, total
+
+        finally:
+            session.close()
+
     def count_by_class(self, class_id: str) -> int:
         """
         Count at-risk students in a class.

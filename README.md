@@ -1,5 +1,7 @@
 # AEWF Backend Service (Flask)
 
+> **API Version:** 1.0 | **Last Updated:** 2026-01-06
+
 Backend service for the **Attendance Early Warning Framework (AEWF)** system. Built with **Flask**, **PostgreSQL**, and **scikit-learn**, this service handles data processing, machine learning model training, and provides APIs for the frontend dashboard.
 
 ## 📋 Features
@@ -301,19 +303,19 @@ All endpoints are prefixed with `/api/v1` and require authentication token (Head
 ### 🏫 Master Data
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/students` | Get list of students (filter by class, active status, search). |
-| `POST` | `/students` | Create a new student. |
-| `GET` | `/students/<nis>` | Get student details. |
+| `GET` | `/students` | Get list of students. Query: `?page=1&per_page=20&class_id=&is_active=true\|false&search=&sort_by=name\|nis\|class_id&order=asc\|desc` |
+| `POST` | `/students` | Create a new student. Body: `{"nis": "...", "name": "...", "class_id": "...", "parent_phone": "...", "is_active": true}` |
+| `GET` | `/students/<nis>` | Get student details with attendance summary. |
 | `PUT` | `/students/<nis>` | Update student details. |
-| `DELETE` | `/students/<nis>` | Soft delete student. |
-| `GET` | `/teachers` | Get list of teachers. |
-| `POST` | `/teachers` | Create a new teacher. |
-| `GET` | `/teachers/<id>` | Get teacher details. |
+| `DELETE` | `/students/<nis>` | Soft delete student (set is_active=false). |
+| `GET` | `/teachers` | Get list of teachers. Query: `?role=Wali Kelas` |
+| `POST` | `/teachers` | Create a new teacher. Body: `{"teacher_id": "...", "name": "...", "role": "...", "phone": "..."}` |
+| `GET` | `/teachers/<id>` | Get teacher details with managed classes. |
 | `PUT` | `/teachers/<id>` | Update teacher details. |
 | `DELETE` | `/teachers/<id>` | Delete teacher (if not assigned to class). |
-| `GET` | `/classes` | Get list of classes. |
-| `POST` | `/classes` | Create a new class. |
-| `GET` | `/classes/<id>` | Get class details. |
+| `GET` | `/classes` | Get list of classes with student count. |
+| `POST` | `/classes` | Create a new class. Body: `{"class_id": "...", "class_name": "...", "wali_kelas_id": "..."}` |
+| `GET` | `/classes/<id>` | Get class details with wali kelas and stats. |
 | `PUT` | `/classes/<id>` | Update class details. |
 | `DELETE` | `/classes/<id>` | Delete class (if empty). |
 
@@ -331,21 +333,21 @@ All endpoints are prefixed with `/api/v1` and require authentication token (Head
 ### 🖨️ Machine Management
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/machines` | List machines (filter by status, search). |
-| `POST` | `/machines` | Create a new machine. |
-| `GET` | `/machines/<id>` | Get machine details. |
-| `PUT` | `/machines/<id>` | Update machine details. |
+| `GET` | `/machines` | List machines. Query: `?page=1&per_page=20&status=active\|inactive&search=&sort_by=machine_code\|location&order=asc\|desc` |
+| `POST` | `/machines` | Create a new machine. Body: `{"machine_code": "...", "location": "...", "status": "active\|inactive"}` |
+| `GET` | `/machines/<id>` | Get machine details with user count. |
+| `PUT` | `/machines/<id>` | Update machine details. Body: `{"location": "...", "status": "..."}` |
 | `DELETE` | `/machines/<id>` | Delete machine. |
-| `GET` | `/machines/<id>/users` | List users on a specific machine. |
+| `GET` | `/machines/<id>/users` | List users on a machine. Query: `?page=1&per_page=20&search=&mapped=true\|false` |
 | `DELETE` | `/machines/<id>/users/<user_id>` | Delete a machine user. |
 
 ### 🔍 Fuzzy Mapping
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/mapping/unmapped` | List unmapped machine users with suggestions. |
-| `GET` | `/mapping/list` | Get paginated list of all mappings with filters (status, machine_id, class_id, search). |
-| `POST` | `/mapping/bulk-verify` | Bulk verify or reject mappings. |
-| `GET` | `/mapping/stats` | Get mapping statistics. |
+| `GET` | `/mapping/unmapped` | List unmapped machine users. Query: `?page=1&per_page=20&machine_id=&include_suggestions=true\|false` |
+| `GET` | `/mapping/list` | Get all mappings. Query: `?page=1&per_page=20&status=verified\|suggested\|rejected&machine_id=&class_id=&search=` |
+| `POST` | `/mapping/bulk-verify` | Bulk verify/reject mappings. Body: `{"mappings": [{"mapping_id": 1, "status": "verified"}, ...]}` |
+| `GET` | `/mapping/stats` | Get mapping statistics (total, mapped, verified, suggested counts). |
 | `GET` | `/mapping/<id>` | Get mapping details. |
 | `DELETE` | `/mapping/<id>` | Delete a mapping. |
 | `DELETE` | `/mapping/student/<nis>` | Remove mapping for a student (unmap). |
@@ -356,36 +358,40 @@ All endpoints are prefixed with `/api/v1` and require authentication token (Head
 ### 📅 Attendance Management
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/attendance/daily` | Get daily attendance list with filters (date, class, status). |
-| `GET` | `/attendance/student/<nis>` | Get attendance history for a specific student. |
-| `POST` | `/attendance/manual` | Create a manual attendance entry. Body: `{"student_nis": "...", "status": "Sick", ...}` |
-| `PUT` | `/attendance/<id>` | Update an attendance record. |
-| `GET` | `/attendance/summary` | Get aggregated attendance summary/analytics. |
+| `GET` | `/attendance/daily` | Get daily attendance list. Query: `?date=YYYY-MM-DD&start_date=YYYY-MM-DD&end_date=YYYY-MM-DD&class_id=&status=Present\|Absent\|Late\|Sick\|Permission&page=1&per_page=20&paginate=true\|false` |
+| `GET` | `/attendance/student/<nis>` | Get attendance history for a specific student. Query: `?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD&month=YYYY-MM` |
+| `POST` | `/attendance/manual` | Create a manual attendance entry. Body: `{"student_nis": "...", "attendance_date": "YYYY-MM-DD", "status": "Sick\|Permission\|..."}` |
+| `PUT` | `/attendance/<id>` | Update an attendance record. Body: `{"status": "...", "check_in": "...", "check_out": "...", "notes": "..."}` |
+| `GET` | `/attendance/summary` | Get aggregated attendance summary with daily breakdown. Query: `?class_id=&period=YYYY-MM&start_date=YYYY-MM-DD&end_date=YYYY-MM-DD` |
 
 ### 📊 Dashboard & Analytics
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/dashboard/stats` | Get complete dashboard statistics (overview, today's attendance, monthly stats, risk summary). |
-| `GET` | `/analytics/trends` | Get attendance trend data for charts. Query: `?period=weekly\|monthly&start_date=&end_date=` |
-| `GET` | `/analytics/class-comparison` | Get class-by-class attendance comparison. Query: `?period=YYYY-MM` |
-| `GET` | `/analytics/student-patterns/<nis>` | Get individual student attendance patterns (summary, trend, weekly patterns). |
+| `GET` | `/dashboard/stats` | Get complete dashboard statistics. Returns: overview (entity counts), today_attendance, this_month (monthly stats), risk_summary. *Note: Admin sees all data, Teacher sees only their classes.* |
+| `GET` | `/analytics/trends` | Get attendance trend data for charts. Query: `?period=weekly\|monthly&start_date=YYYY-MM-DD&end_date=YYYY-MM-DD`. *Role-based filtering applies.* |
+| `GET` | `/analytics/class-comparison` | Get class-by-class attendance comparison. Query: `?period=YYYY-MM`. *Role-based filtering applies.* |
+| `GET` | `/analytics/student-patterns/<nis>` | Get individual student attendance patterns (summary, weekly analysis, trend direction, consecutive absences). |
 
 ### 🚨 Risk Management
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/risk/list` | List at-risk students (filter by level, class). |
-| `GET` | `/risk/<nis>` | Get detailed risk profile for a student. |
-| `GET` | `/risk/alerts` | Get risk alerts (filter by status). |
-| `POST` | `/risk/alerts/<id>/action` | Take action on an alert (update status). |
-| `GET` | `/risk/history/<nis>` | Get historical risk scores. |
-| `POST` | `/risk/recalculate` | Trigger batch risk recalculation. |
+| `GET` | `/risk/list` | List at-risk students. Query: `?level=high\|medium\|low&class_id=&page=1&per_page=20` |
+| `GET` | `/risk/<nis>` | Get detailed risk profile for a student (ML prediction, factors, recommendations). |
+| `GET` | `/risk/alerts` | Get risk alerts. Query: `?status=pending\|acknowledged\|resolved&class_id=&page=1&per_page=20` |
+| `GET` | `/risk/alerts/actioned` | Get actioned alerts (acknowledged/resolved). Query: `?class_id=&action_type=&start_date=YYYY-MM-DD&end_date=YYYY-MM-DD&page=1&per_page=20` |
+| `POST` | `/risk/alerts/<id>/action` | Take action on an alert. Body: `{"action": "...", "notes": "...", "follow_up_date": "YYYY-MM-DD", "status": "acknowledged\|resolved"}` |
+| `GET` | `/risk/history/<nis>` | Get historical risk scores for a student. |
+| `POST` | `/risk/recalculate` | Trigger batch risk recalculation. Body: `{"class_id": "...", "student_nis": "..."}` (optional filters) |
 
 ### 🤖 ML Model Management
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/models/info` | Get installed ML models info. |
-| `GET` | `/models/performance` | Get recent model performance metrics. |
+| `GET` | `/models/info` | Get installed ML models info (model type, version, training date). |
+| `GET` | `/models/performance` | Get model performance metrics (recall, F1, AUC-ROC, threshold, feature importance). |
 | `POST` | `/models/retrain` | Trigger retraining of ML models. |
+| `POST` | `/models/train` | Alias for `/models/retrain`. |
+| `GET` | `/models/predict/<nis>` | Get ML risk prediction for a specific student (tier, probability, factors). |
+| `GET` | `/models/features` | Get feature importance from the trained model (coefficient weights). |
 
 ### 📄 Reports & Export
 | Method | Endpoint | Description |

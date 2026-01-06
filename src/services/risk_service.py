@@ -198,6 +198,49 @@ class RiskService:
 
         return success, None
 
+    def get_actioned_alerts(
+        self,
+        class_id: Optional[str] = None,
+        action_type: Optional[str] = None,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        page: int = 1,
+        per_page: int = 20,
+    ) -> tuple:
+        """
+        Get list of alerts that have been actioned (acknowledged or resolved).
+
+        Args:
+            class_id: Filter by class
+            action_type: Filter by action taken
+            start_date: Filter alerts actioned from this date
+            end_date: Filter alerts actioned until this date
+            page: Page number
+            per_page: Items per page
+
+        Returns:
+            tuple: (alerts list, pagination dict)
+        """
+        alerts, total = self.repository.get_actioned_alerts(
+            class_id=class_id,
+            action_type=action_type,
+            start_date=start_date,
+            end_date=end_date,
+            page=page,
+            per_page=per_page,
+        )
+
+        import math
+
+        pagination = {
+            "page": page,
+            "per_page": per_page,
+            "total": total,
+            "pages": math.ceil(total / per_page) if per_page > 0 else 0,
+        }
+
+        return alerts, pagination
+
     def get_risk_history(self, nis: str) -> tuple:
         """
         Get risk history for a student.
