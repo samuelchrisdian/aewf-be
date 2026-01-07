@@ -227,36 +227,50 @@ class RiskRepository:
         """
         session = SessionLocal()
         try:
-            query = (
+            # Base query
+            base_query = session.query(
+                RiskAlert,
+                Student.name.label("student_name"),
+                Student.class_id,
+                Class.class_name,
+                Teacher.name.label("assignee_name"),
+            ).join(Student, RiskAlert.student_nis == Student.nis)
+
+            # Default to pending if no status provided
+            status_norm = (status.strip().lower() if status else "pending")
+
+            # Subquery: latest alert per student OVERALL, then filter by requested status
+            latest_overall = (
                 session.query(
-                    RiskAlert,
-                    Student.name.label("student_name"),
-                    Student.class_id,
-                    Class.class_name,
-                    Teacher.name.label("assignee_name"),
+                    RiskAlert.student_nis,
+                    func.max(RiskAlert.created_at).label("latest"),
                 )
-                .join(Student, RiskAlert.student_nis == Student.nis)
+                .group_by(RiskAlert.student_nis)
+                .subquery()
+            )
+
+            query = (
+                base_query.join(
+                    latest_overall,
+                    and_(
+                        RiskAlert.student_nis == latest_overall.c.student_nis,
+                        RiskAlert.created_at == latest_overall.c.latest,
+                    ),
+                )
+                .filter(func.lower(RiskAlert.status) == status_norm)
                 .outerjoin(Class, Student.class_id == Class.class_id)
                 .outerjoin(Teacher, RiskAlert.assigned_to == Teacher.teacher_id)
             )
 
-            # Normalize and apply status filter (case-insensitive)
-            if status:
-                status_norm = status.strip().lower()
-                query = query.filter(func.lower(RiskAlert.status) == status_norm)
-            else:
-                # Default to pending alerts if no status provided
-                query = query.filter(func.lower(RiskAlert.status) == "pending")
+            # Class filter
             if class_id:
                 query = query.filter(Student.class_id == class_id)
 
             # Order by created_at descending
             query = query.order_by(desc(RiskAlert.created_at))
 
-            # Get total count
+            # Count and paginate
             total = query.count()
-
-            # Paginate
             offset = (page - 1) * per_page
             results = query.offset(offset).limit(per_page).all()
 
@@ -310,6 +324,19 @@ class RiskRepository:
         finally:
             session.close()
 
+    def get_latest_alert_for_student(self, nis: str) -> Optional[RiskAlert]:
+        """Get the latest alert (any status) for a specific student."""
+        session = SessionLocal()
+        try:
+            return (
+                session.query(RiskAlert)
+                .filter(RiskAlert.student_nis == nis)
+                .order_by(desc(RiskAlert.created_at))
+                .first()
+            )
+        finally:
+            session.close()
+
     def update_alert_action(
         self,
         alert_id: int,
@@ -349,6 +376,24 @@ class RiskRepository:
             else:
                 # Clear resolved_at if moving out of resolved state
                 alert.resolved_at = None
+
+            # Also normalize other pending alerts for same student to this status
+            if status_norm in ["acknowledged", "resolved"] and alert.student_nis:
+                pending_others = (
+                    session.query(RiskAlert)
+                    .filter(
+                        RiskAlert.student_nis == alert.student_nis,
+                        RiskAlert.status == "pending",
+                        RiskAlert.id != alert.id,
+                    )
+                    .all()
+                )
+                for other in pending_others:
+                    other.status = status_norm
+                    if status_norm == "resolved":
+                        other.resolved_at = datetime.utcnow()
+                    else:
+                        other.resolved_at = None
 
             session.commit()
             return True

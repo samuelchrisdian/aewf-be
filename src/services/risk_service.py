@@ -414,38 +414,48 @@ class RiskService:
         return scores.get(color, 0)
 
     def _generate_alert_if_needed(self, nis: str, ml_result: dict) -> None:
-        """Generate an alert for high-risk student if not already pending."""
+        """Generate an alert for high-risk student if not already pending.
+
+        Cooldown: Do not create a new pending alert if the latest alert for the
+        student (any status) was created today. This avoids immediate re-creation
+        after acknowledgment when recalculation runs frequently.
+        """
         try:
-            # Check for existing pending alert
+            # Check the latest alert for this student
+            latest = self.repository.get_latest_alert_for_student(nis)
+
+            # If latest alert exists and was created today, skip creating a new one
+            from datetime import datetime as dt
+
+            if latest and latest.created_at and latest.created_at.date() == dt.utcnow().date():
+                return
+
+            # If there is an active pending alert, skip creating another
             alerts, _ = self.repository.get_alerts(status="pending")
-            existing = [a for a in alerts if a["student_nis"] == nis]
+            if any(a["student_nis"] == nis for a in alerts):
+                return
 
-            if not existing:
-                # Build detailed alert message
-                factors = ml_result.get("factors", {})
-                probability = ml_result.get("risk_probability", 0)
-                method = ml_result.get("prediction_method", "unknown")
+            # Build detailed alert message
+            factors = ml_result.get("factors", {})
+            probability = ml_result.get("risk_probability", 0)
+            method = ml_result.get("prediction_method", "unknown")
 
-                message_parts = [f"High risk detected (probability: {probability:.1%})"]
+            message_parts = [f"High risk detected (probability: {probability:.1%})"]
 
-                if ml_result.get("rule_reason"):
-                    message_parts.append(
-                        f"Rule triggered: {ml_result.get('rule_reason')}"
-                    )
+            if ml_result.get("rule_reason"):
+                message_parts.append(f"Rule triggered: {ml_result.get('rule_reason')}")
 
-                if factors.get("absent_ratio"):
-                    message_parts.append(f"Absent ratio: {factors['absent_ratio']:.1%}")
+            if factors.get("absent_ratio"):
+                message_parts.append(f"Absent ratio: {factors['absent_ratio']:.1%}")
 
-                if factors.get("trend_score") and factors.get("trend_score") < 0:
-                    message_parts.append(
-                        f"Declining trend: {factors['trend_score']:.2f}"
-                    )
+            if factors.get("trend_score") and factors.get("trend_score") < 0:
+                message_parts.append(f"Declining trend: {factors['trend_score']:.2f}")
 
-                self.repository.create_alert(
-                    student_nis=nis,
-                    alert_type="high_risk",
-                    message=" | ".join(message_parts),
-                )
+            self.repository.create_alert(
+                student_nis=nis,
+                alert_type="high_risk",
+                message=" | ".join(message_parts),
+            )
         except Exception as e:
             logger.error(f"Error generating alert for {nis}: {e}")
 
