@@ -434,7 +434,8 @@ class ExportService:
                 day_date = datetime(year, month, day)
                 is_weekend = day_date.weekday() >= 5
 
-                status = attendance_map.get(day, "")
+                # Only process attendance data if not weekend
+                status = attendance_map.get(day, "") if not is_weekend else ""
                 display_text = ""
                 cell_style = formats["status"]
 
@@ -456,6 +457,7 @@ class ExportService:
                         display_text = "a"
                         absent_count += 1
 
+                # Apply appropriate formatting
                 if is_weekend:
                     worksheet.write(row, col, display_text, formats["weekend_cell"])
                 else:

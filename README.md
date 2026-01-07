@@ -1,6 +1,6 @@
 # AEWF Backend Service (Flask)
 
-> **API Version:** 1.0 | **Last Updated:** 2026-01-06
+> **API Version:** 1.0 | **ML Version:** v2 | **Last Updated:** 2026-01-07
 
 Backend service for the **Attendance Early Warning Framework (AEWF)** system. Built with **Flask**, **PostgreSQL**, and **scikit-learn**, this service handles data processing, machine learning model training, and provides APIs for the frontend dashboard.
 
@@ -470,35 +470,41 @@ This project implements a novel **Early Warning System (EWS)** using Machine Lea
 ### 📊 Success Criteria (Thesis Targets)
 | Metric | Target | Achieved |
 |--------|--------|----------|
-| Recall (At-Risk) | ≥ 0.70 | ✅ 0.89 |
-| F1-Score | ≥ 0.65 | ✅ 0.94 |
+| Recall (At-Risk) | ≥ 0.70 | ✅ 1.00 |
+| F1-Score | ≥ 0.65 | ✅ 1.00 |
 | AUC-ROC | ≥ 0.75 | ✅ 1.00 |
 | API Response | < 3 sec | ✅ <100ms |
 
+> **Model Version v2**: Now with Global Active Days and Recording Quality features.
+
 ### 1. Feature Engineering (`src/ml/preprocessing.py`)
-The system automatically extracts **11 features** from daily attendance logs:
+The system (v2) automatically extracts **13 features** from daily attendance logs:
 
 | Feature | Description |
 |---------|-------------|
-| `absent_count` | Total absences (recorded + **inferred**) |
+| `absent_count` | Total explicit absences |
 | `late_count` | Count of 'Late' check-ins |
 | `present_count` | Count of 'Present' check-ins |
 | `permission_count` | Count of 'Permission' status |
 | `sick_count` | Count of 'Sick' status |
-| `total_days` | Expected school days |
+| `total_days` | **Global active days** (days with ≥50% students) |
 | `absent_ratio` | Absence rate (0.0-1.0) |
 | `late_ratio` | Late rate (0.0-1.0) |
 | `attendance_ratio` | Presence rate (0.0-1.0) |
 | `trend_score` | 7-day trend (-1 to +1) |
 | `is_rule_triggered` | Rule-based override flag |
+| `recording_completeness` | **[v2]** Recorded days / Expected days (0.0-1.0) |
+| `longest_gap_days` | **[v2]** Max consecutive active days without record |
 
-#### 🔑 Inferred Absences (Key Feature)
-Students without attendance records for certain days are treated as **absent**:
+#### 🔑 Global Active Days (v2)
+Replaces the previous "max recorded days per student" approach:
 ```
-Expected School Days = MAX(recorded_days across all students)
-Inferred Absents = Expected - Recorded Days
-Total Absent = Recorded Absent + Inferred Absent
+Active Day = Day where ≥50% students have records (weekend excluded)
+Expected Days = Count of active days in period
+recording_completeness = recorded_days / expected_days
 ```
+
+> **Note**: `recording_completeness` is a **data quality indicator**, NOT used for At-Risk labeling.
 
 ### 2. Model Training (`src/ml/training.py`)
 - **Algorithm**: Logistic Regression with `class_weight='balanced'`

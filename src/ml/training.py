@@ -37,8 +37,10 @@ from src.ml.preprocessing import (
     engineer_features_from_df,
     get_feature_columns,
     prepare_features_for_model,
+    get_data_quality_flags,
     FEATURE_COLUMNS,
     ABSENT_RATIO_THRESHOLD,
+    LOW_COMPLETENESS_THRESHOLD,
 )
 import logging
 
@@ -63,6 +65,9 @@ THRESHOLD_STEP = 0.05
 TARGET_RECALL = 0.70
 TARGET_F1 = 0.65
 TARGET_AUC_ROC = 0.75
+
+# Model versioning (v2 = with recording quality features)
+MODEL_VERSION = "v2"
 
 # Ensure model directory exists
 if not os.path.exists(MODEL_DIR):
@@ -293,6 +298,7 @@ def save_model_and_metadata(
 
     # Save metadata
     metadata = {
+        "model_version": MODEL_VERSION,  # v2: with recording quality features
         "trained_at": datetime.now(timezone.utc).isoformat(),
         "model_type": "LogisticRegression",
         "explainer_type": "DecisionTree",
@@ -354,15 +360,99 @@ def train_and_save_models(features_df: pd.DataFrame = None) -> Dict:
 
         logger.info(f"Class distribution: Normal={sum(y==0)}, At-Risk={sum(y==1)}")
 
+        # Check data quality (separate from behavioral risk)
+        low_data_mask = get_data_quality_flags(df_features)
+        low_data_count = low_data_mask.sum()
+        if low_data_count > 0:
+            pct = low_data_count / len(df_features) * 100
+            if pct > 30:
+                logger.warning(
+                    f"Data quality issue: {low_data_count}/{len(df_features)} ({pct:.1f}%) students have "
+                    f"recording_completeness < {LOW_COMPLETENESS_THRESHOLD:.0%}. "
+                    f"Consider improving data collection."
+                )
+            else:
+                logger.info(
+                    f"Data quality: {low_data_count} students ({pct:.1f}%) have low recording completeness."
+                )
+
         # Check for class diversity
         if len(np.unique(y)) < 2:
             logger.warning("Not enough class diversity (all data belongs to one class)")
             return {"status": "error", "message": "Not enough class diversity"}
 
-        # Split data
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=0.2, random_state=42, stratify=y
-        )
+        # Check minimum samples per class for stratified split
+        class_counts = {0: sum(y == 0), 1: sum(y == 1)}
+        min_required = 2  # Minimum samples needed per class for stratified split
+
+        for class_label, count in class_counts.items():
+            if count < min_required:
+                class_name = "At-Risk" if class_label == 1 else "Normal"
+                msg = (
+                    f"Not enough data for training. Class '{class_name}' only has "
+                    f"{count} sample(s), but at least {min_required} are required. "
+                    f"Please add more attendance data before retraining."
+                )
+                logger.warning(msg)
+                return {"status": "error", "message": msg}
+
+        # Recommend minimum samples for reliable training
+        MIN_RECOMMENDED_SAMPLES = 10
+        if len(y) < MIN_RECOMMENDED_SAMPLES:
+            logger.warning(
+                f"Training with only {len(y)} samples. "
+                f"For reliable results, at least {MIN_RECOMMENDED_SAMPLES} samples are recommended."
+            )
+
+        # Smart train_test_split handling for imbalanced data
+        minority_count = min(class_counts.values())
+        test_size = 0.2
+        use_stratify = True
+
+        # Calculate minimum samples needed for stratified split
+        # test_size * minority_count must be >= 1 for stratified split to work
+        if minority_count < 5:
+            # Very few minority samples - adjust strategy
+            if minority_count < 3:
+                # Too few for stratified split with 20% test
+                # Try smaller test size
+                if minority_count >= 2:
+                    test_size = 1 / minority_count  # Ensure at least 1 sample in test
+                    test_size = max(0.1, min(0.3, test_size))  # Keep between 10-30%
+                    logger.warning(
+                        f"Minority class has only {minority_count} samples. "
+                        f"Adjusting test_size to {test_size:.2f}"
+                    )
+                else:
+                    # Cannot stratify with only 1 sample
+                    use_stratify = False
+                    logger.warning(
+                        f"Minority class has only {minority_count} sample. "
+                        f"Disabling stratification for train/test split."
+                    )
+            else:
+                logger.info(
+                    f"Minority class has {minority_count} samples - using stratified split"
+                )
+
+        # Split data with appropriate strategy
+        try:
+            if use_stratify:
+                X_train, X_test, y_train, y_test = train_test_split(
+                    X, y, test_size=test_size, random_state=42, stratify=y
+                )
+            else:
+                X_train, X_test, y_train, y_test = train_test_split(
+                    X, y, test_size=test_size, random_state=42
+                )
+        except ValueError as e:
+            # Fallback: try without stratification
+            logger.warning(
+                f"Stratified split failed: {e}. Trying without stratification."
+            )
+            X_train, X_test, y_train, y_test = train_test_split(
+                X, y, test_size=0.2, random_state=42
+            )
 
         logger.info(f"Train set: {len(X_train)}, Test set: {len(X_test)}")
 

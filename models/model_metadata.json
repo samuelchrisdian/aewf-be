@@ -1,5 +1,6 @@
 {
-  "trained_at": "2025-12-30T20:00:38.589610",
+  "model_version": "v2",
+  "trained_at": "2026-01-07T14:55:20.435371+00:00",
   "model_type": "LogisticRegression",
   "explainer_type": "DecisionTree",
   "threshold": 0.5,
@@ -14,55 +15,62 @@
     "late_ratio",
     "attendance_ratio",
     "trend_score",
-    "is_rule_triggered"
+    "is_rule_triggered",
+    "recording_completeness",
+    "longest_gap_days"
   ],
   "metrics": {
     "threshold": 0.5,
-    "recall": 0.8888888888888888,
-    "f1": 0.9411764705882353,
+    "recall": 1.0,
+    "f1": 1.0,
     "precision": 1.0,
     "auc_roc": 1.0
   },
   "feature_importance": [
     {
-      "feature": "absent_count",
-      "coefficient": 1.7120834349469503,
-      "abs_importance": 1.7120834349469503
-    },
-    {
-      "feature": "present_count",
-      "coefficient": -0.8960098230931904,
-      "abs_importance": 0.8960098230931904
-    },
-    {
       "feature": "late_count",
-      "coefficient": -0.814429748859188,
-      "abs_importance": 0.814429748859188
+      "coefficient": 2.1195928177376926,
+      "abs_importance": 2.1195928177376926
     },
     {
-      "feature": "is_rule_triggered",
-      "coefficient": 0.24555575073664282,
-      "abs_importance": 0.24555575073664282
-    },
-    {
-      "feature": "absent_ratio",
-      "coefficient": 0.08152778261631839,
-      "abs_importance": 0.08152778261631839
-    },
-    {
-      "feature": "attendance_ratio",
-      "coefficient": -0.04266713443316,
-      "abs_importance": 0.04266713443316
+      "feature": "longest_gap_days",
+      "coefficient": -0.16063598952142027,
+      "abs_importance": 0.16063598952142027
     },
     {
       "feature": "late_ratio",
-      "coefficient": -0.038782368993319244,
-      "abs_importance": 0.038782368993319244
+      "coefficient": 0.1324745511086058,
+      "abs_importance": 0.1324745511086058
+    },
+    {
+      "feature": "recording_completeness",
+      "coefficient": 0.09845323633093031,
+      "abs_importance": 0.09845323633093031
+    },
+    {
+      "feature": "present_count",
+      "coefficient": -0.022555487597579534,
+      "abs_importance": 0.022555487597579534
+    },
+    {
+      "feature": "attendance_ratio",
+      "coefficient": -0.0014097179748487208,
+      "abs_importance": 0.0014097179748487208
     },
     {
       "feature": "total_days",
-      "coefficient": 0.001643862982682558,
-      "abs_importance": 0.001643862982682558
+      "coefficient": -0.00018641815722124242,
+      "abs_importance": 0.00018641815722124242
+    },
+    {
+      "feature": "absent_count",
+      "coefficient": 0.0,
+      "abs_importance": 0.0
+    },
+    {
+      "feature": "permission_count",
+      "coefficient": 0.0,
+      "abs_importance": 0.0
     },
     {
       "feature": "sick_count",
@@ -70,7 +78,12 @@
       "abs_importance": 0.0
     },
     {
-      "feature": "permission_count",
+      "feature": "absent_ratio",
+      "coefficient": 0.0,
+      "abs_importance": 0.0
+    },
+    {
+      "feature": "is_rule_triggered",
       "coefficient": 0.0,
       "abs_importance": 0.0
     },

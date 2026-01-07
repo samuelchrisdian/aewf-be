@@ -14,10 +14,12 @@ Sistem ML EWS bertujuan untuk:
 ### Success Criteria (Target Thesis)
 | Metrik | Target | Dicapai |
 |--------|--------|---------|
-| Recall (At-Risk) | ≥ 0.70 | ✅ 0.89 |
-| F1-Score | ≥ 0.65 | ✅ 0.94 |
+| Recall (At-Risk) | ≥ 0.70 | ✅ 1.00 |
+| F1-Score | ≥ 0.65 | ✅ 1.00 |
 | AUC-ROC | ≥ 0.75 | ✅ 1.00 |
 | Respons API | < 3 detik | ✅ <100ms |
+
+> **Model Version**: v2 (dengan fitur recording quality)
 
 ---
 
@@ -57,70 +59,79 @@ src/ml/preprocessing.py
 ```
 
 ### Apa yang dilakukan?
-Mengubah data kehadiran mentah menjadi **11 fitur** yang siap digunakan untuk model ML.
+Mengubah data kehadiran mentah menjadi **13 fitur** yang siap digunakan untuk model ML.
 
-### Fitur yang Di-generate
+### Fitur yang Di-generate (v2)
 
 | Fitur | Tipe | Deskripsi |
 |-------|------|-----------|
-| `absent_count` | int | Total ketidakhadiran (**termasuk inferred**) |
+| `absent_count` | int | Total ketidakhadiran (**explicit only**, tidak inferred) |
 | `late_count` | int | Total keterlambatan |
 | `present_count` | int | Total hadir tepat waktu |
 | `permission_count` | int | Total izin |
 | `sick_count` | int | Total sakit |
-| `total_days` | int | **Expected** hari sekolah (bukan recorded) |
+| `total_days` | int | **Global active days** (hari dengan ≥50% siswa aktif) |
 | `absent_ratio` | float | Rasio ketidakhadiran (0.0-1.0) |
 | `late_ratio` | float | Rasio keterlambatan (0.0-1.0) |
 | `attendance_ratio` | float | Rasio kehadiran (0.0-1.0) |
 | `trend_score` | float | Tren 7 hari terakhir (-1 s/d +1) |
 | `is_rule_triggered` | bool | True jika memenuhi rule threshold |
+| `recording_completeness` | float | **[v2]** Rasio hari tercatat vs expected (0.0-1.0) |
+| `longest_gap_days` | int | **[v2]** Gap terpanjang tanpa record (dalam active days) |
 
-### 🔑 Inferred Absences (Fitur Penting!)
+### 🔑 Global Active Days (v2 - PERBAIKAN!)
 
-Siswa yang **tidak memiliki record kehadiran** pada hari tertentu dianggap **absent**:
+Versi lama menggunakan max recorded days per siswa, yang bisa bias. **v2 menggunakan Global Active Days**:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                    PERHITUNGAN INFERRED ABSENCES                        │
+│                    PERHITUNGAN GLOBAL ACTIVE DAYS (v2)                  │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                         │
-│  Expected School Days = MAX(recorded_days) dari semua siswa             │
-│                       = Hari terbanyak yang di-record                   │
+│  Hari Aktif = Hari dimana ≥50% siswa memiliki record                   │
 │                                                                         │
-│  Contoh: Jika siswa terbaik punya 21 hari record,                      │
-│          maka expected_school_days = 21                                 │
+│  Adaptive Thresholds (fallback):                                        │
+│  - Coba 60% → 50% → 40% hingga dapat MIN_ACTIVE_DAYS                   │
 │                                                                         │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│  Inferred Absent = Expected - Recorded Days                             │
-│                                                                         │
-│  Contoh:                                                                │
-│  - Siswa A: 21 records → Inferred Absent = 0                           │
-│  - Siswa B: 5 records  → Inferred Absent = 21 - 5 = 16                 │
-│  - Siswa C: 1 record   → Inferred Absent = 21 - 1 = 20                 │
+│  Guardrails:                                                            │
+│  - MIN_ACTIVE_STUDENTS = 5                                              │
+│  - MIN_ACTIVE_DAYS = 5                                                  │
+│  - EXCLUDE_WEEKENDS = True (filter Sabtu/Minggu)                        │
 │                                                                         │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                         │
-│  Total Absent = Recorded Absent + Inferred Absent                       │
+│  Recording Quality Features (v2):                                       │
 │                                                                         │
-│  Contoh Siswa B:                                                        │
-│  - Recorded: 5 days (4 present, 1 late, 0 absent)                      │
-│  - Inferred Absent: 16                                                  │
-│  - Total Absent: 0 + 16 = 16                                           │
-│  - Absent Ratio: 16 / 21 = 76% → 🔴 HIGH RISK!                         │
+│  - recording_completeness = recorded_days / expected_days (0-1)        │
+│  - longest_gap_days = longest consecutive active days tanpa record     │
+│                                                                         │
+│  ⚠️ Data Quality ≠ Behavioral Risk!                                    │
+│  Siswa dengan recording_completeness < 0.7 diberi FLAG,                │
+│  tapi TIDAK otomatis dianggap At-Risk.                                  │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-**Mengapa ini penting?**
-- Siswa yang jarang/tidak pernah scan fingerprint tidak boleh dianggap "baik"
-- Tanpa fitur ini, siswa dengan 1 hari hadir akan dianggap 100% attendance!
-- Inferred absences menangkap siswa yang **completely missing** dari sekolah
+**Mengapa ini lebih baik?**
+- Tidak bias oleh 1 siswa dengan banyak record
+- Weekend otomatis difilter
+- Missing record BUKAN = Absent (bisa data belum diinput)
+- Data quality terpisah dari behavioral risk
 
 ### Konstanta Penting
 ```python
+# Rule-based thresholds
 ABSENT_RATIO_THRESHOLD = 0.15   # Jika absent_ratio > 15% → Rule triggered
 ABSENT_COUNT_THRESHOLD = 5      # Jika total_absent > 5  → Rule triggered
+
+# Global Active Days (v2)
+ACTIVE_DAY_THRESHOLDS = [0.6, 0.5, 0.4]  # Fallback thresholds
+MIN_ACTIVE_STUDENTS = 5
+MIN_ACTIVE_DAYS = 5
+EXCLUDE_WEEKENDS = True
+
+# Data Quality (v2)
+LOW_COMPLETENESS_THRESHOLD = 0.7  # < 70% = low data quality flag
 ```
 
 ### Cara Penggunaan
@@ -342,13 +353,14 @@ info = MLService.get_model_info()
 importance = MLService.get_feature_importance()
 ```
 
-### Response Format
+### Response Format (v2)
 ```json
 {
     "nis": "2024001",
     "risk_tier": "RED",
     "risk_probability": 0.85,
-    "explanation_text": "Faktor Utama Risiko (Berdasarkan Bobot):\n- Total Ketidakhadiran tergolong tinggi (6 hari).\n- Tren Kehadiran memburuk dalam 7 hari terakhir.\n\nLogika Deteksi (Aturan):\n- Rasio Absensi > 0.12",
+    "model_version": "v2",
+    "explanation_text": "Faktor Utama Risiko (Berdasarkan Bobot):\n- Total Ketidakhadiran tergolong tinggi (6 hari).\n- Tren Kehadiran memburuk dalam 7 hari terakhir.",
     "is_rule_overridden": false,
     "prediction_method": "ml",
     "model_threshold": 0.5,
@@ -359,11 +371,20 @@ importance = MLService.get_feature_importance()
         "late_count": 3,
         "trend_score": -0.15,
         "total_days": 30,
-        "attendance_ratio": 0.75
+        "attendance_ratio": 0.75,
+        "recording_completeness": 0.85,
+        "longest_gap_days": 2
+    },
+    "data_quality": {
+        "recording_completeness": 0.85,
+        "is_low_quality": false,
+        "longest_gap_days": 2
     },
     "response_time_ms": 12.5
 }
 ```
+
+> **Note**: `data_quality` adalah block terpisah untuk indikator kualitas data (bukan behavioral risk).
 
 ---
 
@@ -565,6 +586,14 @@ Karena `absent_count` sekarang termasuk **inferred absences**:
 
 ---
 
+### v2.0 (2026-01-07)
+- ✅ **Global Active Days** - Replaced max per student with global activity threshold
+- ✅ **Recording Quality Features** - Added `recording_completeness`, `longest_gap_days`
+- ✅ **Weekend Exclusion** - Filter Sat/Sun from school days
+- ✅ **Separate Data Quality from Risk** - `is_low_quality` flag, not label
+- ✅ **Model Versioning** - Added `model_version: "v2"` to metadata and API response
+- ✅ **Adaptive Thresholds** - Fallback 0.6 → 0.5 → 0.4 for active days
+
 ### v1.3 (2025-12-30)
 - ✅ **`explanation_text` now saved to `risk_history.factors` JSON**
 - ✅ Interpretation persisted for historical tracking and auditing
@@ -590,4 +619,4 @@ Karena `absent_count` sekarang termasuk **inferred absences**:
 
 ---
 
-*Dokumen ini di-generate untuk AEWF Backend v1.2 - Machine Learning Module*
+*Dokumen ini di-generate untuk AEWF Backend v2.0 - Machine Learning Module*

@@ -1,9 +1,15 @@
 """
-ML Feature Engineering for Early Warning System (EWS)
+ML Feature Engineering for Early Warning System (EWS) - Version 2
 
 This module provides robust feature engineering for student attendance data.
 Features are designed to support both ML-based prediction and rule-based triggers
 for the hybrid EWS engine.
+
+v2 Changes:
+- Global Active Days calculation with adaptive thresholds
+- Recording quality features (completeness, longest gap)
+- Weekend exclusion option
+- Data quality separated from behavioral risk
 
 Technical Success Criteria:
 - Handle 88 students efficiently
@@ -13,24 +19,34 @@ Technical Success Criteria:
 
 import pandas as pd
 import numpy as np
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from sqlalchemy.orm import Session
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional, Tuple, Set
 import logging
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # =============================================================================
-# FEATURE CONFIGURATION
+# FEATURE CONFIGURATION (v2)
 # =============================================================================
 
 # Rule-based thresholds for automatic RED classification
 ABSENT_RATIO_THRESHOLD = 0.15  # If absent_ratio > 15%, trigger rule
 ABSENT_COUNT_THRESHOLD = 5  # If total_absent > 5, trigger rule
 
+# Global Active Days configuration
+ACTIVE_DAY_THRESHOLDS = [0.6, 0.5, 0.4]  # Try in order, fallback progressively
+MIN_ACTIVE_STUDENTS = 5  # Minimum students to consider a day "active"
+MIN_ACTIVE_DAYS = 5  # Minimum expected days for valid training
+EXCLUDE_WEEKENDS = True  # Filter out Sat/Sun from school days
+
+# Data quality thresholds
+LOW_COMPLETENESS_THRESHOLD = 0.7  # Below this = low data quality
+
 # Feature columns (must be consistent between training and prediction)
 FEATURE_COLUMNS = [
+    # Behavioral features
     "absent_count",
     "late_count",
     "present_count",
@@ -42,16 +58,135 @@ FEATURE_COLUMNS = [
     "attendance_ratio",
     "trend_score",
     "is_rule_triggered",
+    # Recording quality features (v2)
+    "recording_completeness",
+    "longest_gap_days",
 ]
 
+
 # =============================================================================
-# CORE FEATURE ENGINEERING
+# GLOBAL ACTIVE DAYS CALCULATION (v2)
+# =============================================================================
+
+
+def calculate_global_active_days(df: pd.DataFrame) -> Tuple[int, List]:
+    """
+    Calculate expected school days using global activity with adaptive fallback.
+
+    A "school day" is defined as a day where >= threshold of students have records.
+    Uses adaptive thresholds (0.6 → 0.5 → 0.4) with MIN_ACTIVE_DAYS guardrail.
+
+    Args:
+        df: DataFrame with 'nis' and 'date' columns
+
+    Returns:
+        Tuple of (expected_days, list_of_active_dates)
+    """
+    if df.empty or "date" not in df.columns:
+        return 0, []
+
+    df = df.copy()
+    df["date"] = pd.to_datetime(df["date"])
+
+    # Filter weekends if configured
+    if EXCLUDE_WEEKENDS:
+        df = df[df["date"].dt.dayofweek < 5]  # Mon=0, Sun=6
+
+    if df.empty:
+        return 0, []
+
+    total_students = df["nis"].nunique()
+
+    # Count unique students per date
+    records_per_date = df.groupby("date")["nis"].nunique()
+
+    # Try thresholds in order until we get MIN_ACTIVE_DAYS
+    for threshold in ACTIVE_DAY_THRESHOLDS:
+        min_students = max(MIN_ACTIVE_STUDENTS, int(total_students * threshold))
+        active_dates_mask = records_per_date >= min_students
+        active_dates = records_per_date[active_dates_mask].index.tolist()
+
+        if len(active_dates) >= MIN_ACTIVE_DAYS:
+            logger.info(
+                f"Global active days: {len(active_dates)} (threshold={threshold:.0%}, "
+                f"min_students={min_students})"
+            )
+            return len(active_dates), active_dates
+
+    # Fallback: use all unique dates (with warning)
+    all_dates = records_per_date.index.tolist()
+    logger.warning(
+        f"Could not reach {MIN_ACTIVE_DAYS} active days with any threshold. "
+        f"Using all {len(all_dates)} unique dates."
+    )
+    return len(all_dates), all_dates
+
+
+def calculate_longest_gap(student_dates: Set, active_dates: List) -> int:
+    """
+    Calculate longest consecutive active days WITHOUT a record for a student.
+
+    Uses active_dates (school days), not raw calendar → avoids weekend/holiday gaps.
+
+    Args:
+        student_dates: Set of dates where student has records
+        active_dates: List of active school dates (from global calculation)
+
+    Returns:
+        Integer count of longest consecutive gap
+    """
+    if not active_dates:
+        return 0
+
+    # Convert to set for O(1) lookup
+    student_date_set = set(
+        pd.to_datetime(d).date() if not isinstance(d, date) else d
+        for d in student_dates
+    )
+
+    # Sort active dates
+    sorted_active = sorted(
+        pd.to_datetime(d).date() if not isinstance(d, date) else d for d in active_dates
+    )
+
+    # Find longest consecutive days without record
+    max_gap = 0
+    current_gap = 0
+
+    for active_date in sorted_active:
+        if active_date not in student_date_set:
+            current_gap += 1
+            max_gap = max(max_gap, current_gap)
+        else:
+            current_gap = 0
+
+    return max_gap
+
+
+def calculate_recording_completeness(recorded_days: int, expected_days: int) -> float:
+    """
+    Calculate recording completeness with proper edge case handling.
+
+    Args:
+        recorded_days: Number of days student has records
+        expected_days: Expected school days from global calculation
+
+    Returns:
+        Float between 0.0 and 1.0
+    """
+    if expected_days == 0:
+        return 0.0  # No expected days = no completeness possible
+    return min(recorded_days / expected_days, 1.0)  # Clamp to max 1.0
+
+
+# =============================================================================
+# CORE FEATURE ENGINEERING (v2)
 # =============================================================================
 
 
 def engineer_features_from_df(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Engineer features from a raw attendance DataFrame.
+    Engineer features from a raw attendance DataFrame (v2).
 
     This is the core function used by both training (from DB) and
     validation (from mock data).
@@ -71,9 +206,10 @@ def engineer_features_from_df(df: pd.DataFrame) -> pd.DataFrame:
 
     # Ensure date column is datetime
     if "date" in df.columns:
+        df = df.copy()
         df["date"] = pd.to_datetime(df["date"])
 
-    # Normalize status to title case (handles 'present' -> 'Present', 'late' -> 'Late', etc.)
+    # Normalize status to title case
     df = df.copy()
     df["status"] = df["status"].str.strip().str.title()
 
@@ -90,12 +226,12 @@ def engineer_features_from_df(df: pd.DataFrame) -> pd.DataFrame:
         if status not in status_counts.columns:
             status_counts[status] = 0
 
-    # Rename columns for clarity
+    # Build features DataFrame
     features = pd.DataFrame()
     features["nis"] = status_counts["nis"]
-    features["recorded_absent"] = status_counts["Absent"].astype(
+    features["absent_count"] = status_counts["Absent"].astype(
         int
-    )  # Explicit absent records
+    )  # Explicit absences only
     features["late_count"] = status_counts["Late"].astype(int)
     features["present_count"] = status_counts["Present"].astype(int)
     features["permission_count"] = status_counts["Permission"].astype(int)
@@ -103,7 +239,7 @@ def engineer_features_from_df(df: pd.DataFrame) -> pd.DataFrame:
 
     # Total RECORDED attendance days (days with any record)
     features["recorded_days"] = (
-        features["recorded_absent"]
+        features["absent_count"]
         + features["late_count"]
         + features["present_count"]
         + features["permission_count"]
@@ -111,31 +247,42 @@ def engineer_features_from_df(df: pd.DataFrame) -> pd.DataFrame:
     )
 
     # ==========================================================================
-    # INFERRED ABSENCES: Calculate missing school days as absences
+    # GLOBAL ACTIVE DAYS (v2) - More robust than max per student
     # ==========================================================================
-    # Expected school days = maximum recorded days across all students
-    # (This assumes at least one student has attendance for all school days)
-    expected_school_days = features["recorded_days"].max()
+    expected_days, active_dates = calculate_global_active_days(df)
 
-    # Inferred absences = days student has no record at all
-    features["inferred_absent"] = expected_school_days - features["recorded_days"]
-    features["inferred_absent"] = features["inferred_absent"].clip(
-        lower=0
-    )  # No negative
-
-    # Total absent = recorded absent + inferred absent (no record = absent)
-    features["absent_count"] = features["recorded_absent"] + features["inferred_absent"]
-
-    # Total days for ratio calculation = expected school days
-    features["total_days"] = expected_school_days
+    features["total_days"] = expected_days
 
     logger.info(
-        f"Expected school days: {expected_school_days}, "
-        f"Students with full attendance: {sum(features['recorded_days'] == expected_school_days)}, "
-        f"Students with inferred absences: {sum(features['inferred_absent'] > 0)}"
+        f"Expected school days: {expected_days}, "
+        f"Date range: {min(active_dates).strftime('%Y-%m-%d') if active_dates else 'N/A'} to "
+        f"{max(active_dates).strftime('%Y-%m-%d') if active_dates else 'N/A'}"
     )
 
-    # Calculate ratios based on EXPECTED total days (not just recorded)
+    # ==========================================================================
+    # RECORDING QUALITY FEATURES (v2)
+    # ==========================================================================
+
+    # Recording completeness (clamped 0-1)
+    features["recording_completeness"] = features["recorded_days"].apply(
+        lambda x: calculate_recording_completeness(x, expected_days)
+    )
+
+    # Longest gap calculation (against active dates, not calendar)
+    if active_dates:
+        student_dates_map = df.groupby("nis")["date"].apply(set).to_dict()
+        features["longest_gap_days"] = features["nis"].apply(
+            lambda nis: calculate_longest_gap(
+                student_dates_map.get(nis, set()), active_dates
+            )
+        )
+    else:
+        features["longest_gap_days"] = 0
+
+    # ==========================================================================
+    # RATIO CALCULATIONS
+    # ==========================================================================
+
     features["absent_ratio"] = np.where(
         features["total_days"] > 0,
         features["absent_count"] / features["total_days"],
@@ -155,22 +302,29 @@ def engineer_features_from_df(df: pd.DataFrame) -> pd.DataFrame:
     # Calculate trend for last 7 days per student
     features["trend_score"] = _calculate_trend_scores(df)
 
-    # Rule-based trigger (for hybrid system)
-    # Now includes inferred_absent in absent_count!
+    # Rule-based trigger (for hybrid system) - behavioral only
     features["is_rule_triggered"] = (
         (features["absent_ratio"] > ABSENT_RATIO_THRESHOLD)
         | (features["absent_count"] > ABSENT_COUNT_THRESHOLD)
     ).astype(int)
 
-    # Drop intermediate columns not needed for model
-    features = features.drop(
-        columns=["recorded_absent", "recorded_days", "inferred_absent"]
-    )
+    # Drop intermediate columns
+    features = features.drop(columns=["recorded_days"], errors="ignore")
 
     # Fill any remaining NaN values with 0
     features = features.fillna(0)
 
-    logger.info(f"Engineered features for {len(features)} students")
+    # Log data quality summary
+    low_quality_count = (
+        features["recording_completeness"] < LOW_COMPLETENESS_THRESHOLD
+    ).sum()
+    if low_quality_count > 0:
+        logger.warning(
+            f"Data quality: {low_quality_count}/{len(features)} students have "
+            f"recording_completeness < {LOW_COMPLETENESS_THRESHOLD:.0%}"
+        )
+
+    logger.info(f"Engineered features for {len(features)} students (v2)")
 
     return features
 
@@ -189,20 +343,16 @@ def _calculate_trend_scores(df: pd.DataFrame) -> pd.Series:
     - Score = (recent_good_rate - previous_good_rate)
     """
     if "date" not in df.columns:
-        # No date info, return neutral trend
         return pd.Series(0.0, index=df["nis"].unique())
 
     df = df.copy()
     df["date"] = pd.to_datetime(df["date"])
 
-    # Get the most recent date in the data
     max_date = df["date"].max()
 
-    # Define periods
     recent_start = max_date - timedelta(days=7)
     previous_start = max_date - timedelta(days=14)
 
-    # Good statuses (Present counts as good, others count against)
     def calc_good_rate(group):
         if len(group) == 0:
             return 0.5  # Neutral if no data
@@ -214,20 +364,46 @@ def _calculate_trend_scores(df: pd.DataFrame) -> pd.Series:
     for nis in df["nis"].unique():
         student_df = df[df["nis"] == nis]
 
-        # Recent period (last 7 days)
         recent_data = student_df[student_df["date"] > recent_start]
         recent_rate = calc_good_rate(recent_data)
 
-        # Previous period (7-14 days ago)
         previous_data = student_df[
             (student_df["date"] > previous_start) & (student_df["date"] <= recent_start)
         ]
         previous_rate = calc_good_rate(previous_data)
 
-        # Trend score: improvement is positive
         trends[nis] = recent_rate - previous_rate
 
     return pd.Series(trends)
+
+
+# =============================================================================
+# DATA QUALITY FLAG (v2) - Separate from behavioral risk
+# =============================================================================
+
+
+def get_data_quality_flags(features_df: pd.DataFrame) -> pd.Series:
+    """
+    Flag students with low recording completeness.
+
+    This is SEPARATE from at-risk labeling - it indicates data quality,
+    not student behavior.
+
+    Args:
+        features_df: DataFrame with recording_completeness column
+
+    Returns:
+        Boolean Series where True = low data quality
+    """
+    if "recording_completeness" not in features_df.columns:
+        return pd.Series(False, index=features_df.index)
+
+    return features_df["recording_completeness"] < LOW_COMPLETENESS_THRESHOLD
+
+
+# =============================================================================
+# DATABASE INTEGRATION
+# =============================================================================
 
 
 def engineer_features() -> pd.DataFrame:
@@ -239,21 +415,18 @@ def engineer_features() -> pd.DataFrame:
     Returns:
         DataFrame with engineered features
     """
-    # Import here to avoid circular imports
     from src.domain.models import AttendanceDaily
     from src.app.extensions import db
 
     session = db.session
 
     try:
-        # Fetch all attendance records
         records = session.query(AttendanceDaily).all()
 
         if not records:
             logger.warning("No attendance records found in database")
             return pd.DataFrame(columns=["nis"] + FEATURE_COLUMNS)
 
-        # Convert to DataFrame
         data = [
             {"nis": r.student_nis, "date": r.attendance_date, "status": r.status}
             for r in records
@@ -284,36 +457,32 @@ def engineer_features_for_student(nis: str) -> Dict:
     session = db.session
 
     try:
-        # Fetch student's attendance records
-        records = session.query(AttendanceDaily).filter_by(student_nis=nis).all()
+        # For single student, we need global context
+        # Fetch ALL attendance to calculate global active days
+        all_records = session.query(AttendanceDaily).all()
 
-        if not records:
-            logger.warning(f"No attendance records found for student {nis}")
-            # Return default features (all zeros except is_rule_triggered)
+        if not all_records:
+            logger.warning(f"No attendance records found")
             return {col: 0 for col in FEATURE_COLUMNS}
 
         # Convert to DataFrame
-        data = [
+        all_data = [
             {"nis": r.student_nis, "date": r.attendance_date, "status": r.status}
-            for r in records
+            for r in all_records
         ]
 
-        df = pd.DataFrame(data)
+        df = pd.DataFrame(all_data)
         features_df = engineer_features_from_df(df)
 
         if features_df.empty:
             return {col: 0 for col in FEATURE_COLUMNS}
 
-        # Get the row for this student
         student_features = features_df[features_df["nis"] == nis]
 
         if student_features.empty:
             return {col: 0 for col in FEATURE_COLUMNS}
 
-        # Convert to dictionary
         feature_dict = student_features.iloc[0].to_dict()
-
-        # Remove 'nis' from features (it's an identifier, not a feature)
         feature_dict.pop("nis", None)
 
         return feature_dict
@@ -347,17 +516,19 @@ def prepare_features_for_model(features_df: pd.DataFrame) -> pd.DataFrame:
     Returns:
         DataFrame ready for model.predict()
     """
-    # Create a copy with only feature columns
+    # Ensure all feature columns exist
+    for col in FEATURE_COLUMNS:
+        if col not in features_df.columns:
+            features_df[col] = 0
+
     X = features_df[FEATURE_COLUMNS].copy()
 
-    # Ensure correct dtypes
     for col in X.columns:
         if col in ["is_rule_triggered"]:
             X[col] = X[col].astype(int)
         else:
             X[col] = X[col].astype(float)
 
-    # Fill any NaN
     X = X.fillna(0)
 
     return X

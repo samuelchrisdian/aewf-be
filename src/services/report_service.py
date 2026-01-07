@@ -504,7 +504,8 @@ class ReportService:
                 day_date = dt(year, month, day)
                 is_weekend = day_date.weekday() >= 5
 
-                status = attendance_map.get(day, "")
+                # Only process attendance data if not weekend
+                status = attendance_map.get(day, "") if not is_weekend else ""
                 display_text = ""
 
                 # Map status to display text

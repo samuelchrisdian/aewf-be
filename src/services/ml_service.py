@@ -38,6 +38,7 @@ from src.ml.preprocessing import (
     FEATURE_COLUMNS,
     ABSENT_RATIO_THRESHOLD,
     ABSENT_COUNT_THRESHOLD,
+    LOW_COMPLETENESS_THRESHOLD,
 )
 from src.ml.interpretation import ModelInterpreter
 
@@ -235,11 +236,20 @@ class MLService:
                     "nis": nis,
                     "risk_tier": TIER_RED,
                     "risk_probability": 1.0,
+                    "model_version": "v2",
                     "explanation_text": explanation_text,
                     "is_rule_overridden": True,
                     "prediction_method": "rule",
                     "rule_reason": "; ".join(rule_reason),
                     "factors": factors,
+                    "data_quality": {
+                        "recording_completeness": factors.get(
+                            "recording_completeness", 1.0
+                        ),
+                        "is_low_quality": factors.get("recording_completeness", 1.0)
+                        < LOW_COMPLETENESS_THRESHOLD,
+                        "longest_gap_days": int(factors.get("longest_gap_days", 0)),
+                    },
                     "response_time_ms": round(elapsed * 1000, 2),
                 }
 
@@ -262,11 +272,20 @@ class MLService:
                     "nis": nis,
                     "risk_tier": tier,
                     "risk_probability": prob,
+                    "model_version": "v2",
                     "explanation_text": "Penjelasan tidak tersedia - model belum dimuat.",
                     "is_rule_overridden": False,
                     "prediction_method": "heuristic",
                     "warning": "Model not loaded, using heuristic fallback",
                     "factors": factors,
+                    "data_quality": {
+                        "recording_completeness": factors.get(
+                            "recording_completeness", 1.0
+                        ),
+                        "is_low_quality": factors.get("recording_completeness", 1.0)
+                        < LOW_COMPLETENESS_THRESHOLD,
+                        "longest_gap_days": int(factors.get("longest_gap_days", 0)),
+                    },
                     "response_time_ms": round(elapsed * 1000, 2),
                 }
 
@@ -310,11 +329,20 @@ class MLService:
                 "nis": nis,
                 "risk_tier": tier,
                 "risk_probability": round(float(probability), 4),
+                "model_version": "v2",
                 "explanation_text": explanation_text,
                 "is_rule_overridden": False,
                 "prediction_method": "ml",
                 "model_threshold": threshold,
                 "factors": factors,
+                "data_quality": {
+                    "recording_completeness": factors.get(
+                        "recording_completeness", 1.0
+                    ),
+                    "is_low_quality": factors.get("recording_completeness", 1.0)
+                    < LOW_COMPLETENESS_THRESHOLD,
+                    "longest_gap_days": int(factors.get("longest_gap_days", 0)),
+                },
                 "response_time_ms": round(elapsed * 1000, 2),
             }
 
@@ -328,11 +356,17 @@ class MLService:
                 "nis": nis,
                 "risk_tier": TIER_GREEN,
                 "risk_probability": 0.0,
+                "model_version": "v2",
                 "explanation_text": "Penjelasan tidak tersedia karena terjadi kesalahan.",
                 "is_rule_overridden": False,
                 "prediction_method": "error",
                 "error": str(e),
                 "factors": {},
+                "data_quality": {
+                    "recording_completeness": 0.0,
+                    "is_low_quality": True,
+                    "longest_gap_days": 0,
+                },
                 "response_time_ms": 0,
             }
 
