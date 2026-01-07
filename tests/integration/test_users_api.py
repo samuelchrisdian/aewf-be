@@ -37,13 +37,13 @@ class TestUsersAPI:
                 mock_admin = MagicMock()
                 mock_admin.id = 1
                 mock_admin.username = 'admin'
-                mock_admin.role = 'Admin'
+                mock_admin.role = 'admin'
                 mock_admin.is_active = True
                 
                 mock_staff = MagicMock()
                 mock_staff.id = 2
                 mock_staff.username = 'staff'
-                mock_staff.role = 'Staff'
+                mock_staff.role = 'staff'
                 mock_staff.is_active = True
                 
                 def get_user(id=None):
@@ -84,7 +84,7 @@ class TestUsersAPI:
     def test_list_users_accepts_filters(self, test_client, admin_headers):
         """Test that GET /users accepts filter parameters."""
         response = test_client.get(
-            '/api/v1/users?is_active=true&role=Admin&search=admin',
+            '/api/v1/users?is_active=true&role=admin&search=admin',
             headers=admin_headers
         )
         assert response.status_code in [200, 500]
@@ -151,7 +151,7 @@ class TestUsersAPI:
                 'username': 'newuser',
                 'password': 'password123',
                 'email': 'newuser@example.com',
-                'role': 'Teacher'
+                'role': 'teacher'
             })
         )
         assert response.status_code in [201, 400, 500]  # 400 if username exists
@@ -185,7 +185,7 @@ class TestUsersAPI:
         response = test_client.put(
             '/api/v1/users/1',
             headers=staff_headers,
-            data=json.dumps({'role': 'Teacher'})
+            data=json.dumps({'role': 'teacher'})
         )
         assert response.status_code == 403
     
@@ -194,7 +194,7 @@ class TestUsersAPI:
         response = test_client.put(
             '/api/v1/users/1',
             headers=admin_headers,
-            data=json.dumps({'role': 'InvalidRole'})
+            data=json.dumps({'role': 'invalidrole'})
         )
         assert response.status_code == 400
     
@@ -266,7 +266,7 @@ class TestUsersAPIResponseFormat:
                 mock_decode.return_value = {'user_id': 1}
                 mock_user = MagicMock()
                 mock_user.id = 1
-                mock_user.role = 'Admin'
+                mock_user.role = 'admin'
                 mock_user.is_active = True
                 mock_user_cls.query.filter_by.return_value.first.return_value = mock_user
                 yield
@@ -294,7 +294,7 @@ class TestUsersAPIResponseFormat:
                 mock_decode.return_value = {'user_id': 2}
                 mock_user = MagicMock()
                 mock_user.id = 2
-                mock_user.role = 'Staff'
+                mock_user.role = 'staff'
                 mock_user.is_active = True
                 mock_user_cls.query.filter_by.return_value.first.return_value = mock_user
                 

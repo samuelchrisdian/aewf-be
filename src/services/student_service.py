@@ -61,7 +61,7 @@ class StudentService:
         
         # Role-based filtering
         class_ids = None
-        if current_user and current_user.role == 'Teacher':
+        if current_user and current_user.role.lower() == 'teacher':
             # Get classes managed by this teacher (wali kelas)
             teacher_classes = teacher_repository.get_classes_by_teacher(current_user.username)
             if teacher_classes:

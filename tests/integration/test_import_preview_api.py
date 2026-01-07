@@ -24,7 +24,7 @@ class TestImportPreviewAPI:
                 mock_decode.return_value = {"user_id": 1}
                 mock_user = MagicMock()
                 mock_user.id = 1
-                mock_user.role = "Admin"
+                mock_user.role = "admin"
                 mock_user.is_active = True
                 mock_user_cls.query.filter_by.return_value.first.return_value = (
                     mock_user
@@ -129,7 +129,7 @@ class TestPreviewResponseFormat:
                 mock_decode.return_value = {"user_id": 1}
                 mock_user = MagicMock()
                 mock_user.id = 1
-                mock_user.role = "Admin"
+                mock_user.role = "admin"
                 mock_user.is_active = True
                 mock_user_cls.query.filter_by.return_value.first.return_value = (
                     mock_user

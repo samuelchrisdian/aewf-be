@@ -11,7 +11,7 @@ class User(db.Model):
     username = Column(String, unique=True, nullable=False)
     password_hash = Column(String, nullable=False)
     email = Column(String, nullable=True)
-    role = Column(String, default="Admin")  # Admin, Teacher, Staff
+    role = Column(String, default="admin")  # admin, teacher, staff
     is_active = Column(Boolean, default=True)
     last_login = Column(DateTime, nullable=True)
     refresh_token = Column(String, nullable=True)
@@ -52,7 +52,7 @@ class Teacher(db.Model):
 
     teacher_id = Column(String, primary_key=True, index=True)
     name = Column(String, nullable=False)
-    role = Column(String, default="Teacher") # e.g., "Wali Kelas", "Guru Mapel"
+    role = Column(String, default="teacher") # e.g., "wali kelas", "guru mapel"
 
     # Relationships
     classes = relationship("Class", back_populates="wali_kelas")

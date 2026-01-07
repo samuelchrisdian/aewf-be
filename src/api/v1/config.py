@@ -38,7 +38,7 @@ def get_settings(current_user):
 
 @config_bp.route('/settings', methods=['PUT'])
 @token_required
-@role_required(['Admin'])
+@role_required(['admin'])
 def update_settings(current_user):
     """
     Update system settings.
@@ -105,7 +105,7 @@ def get_school_calendar(current_user):
 
 @config_bp.route('/holidays', methods=['POST'])
 @token_required
-@role_required(['Admin'])
+@role_required(['admin'])
 def add_holiday(current_user):
     """
     Add a school holiday.
@@ -150,7 +150,7 @@ def add_holiday(current_user):
 
 @config_bp.route('/holidays/<int:holiday_id>', methods=['DELETE'])
 @token_required
-@role_required(['Admin'])
+@role_required(['admin'])
 def delete_holiday(current_user, holiday_id):
     """
     Delete a school holiday.

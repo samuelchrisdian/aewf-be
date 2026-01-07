@@ -43,7 +43,7 @@ def role_required(allowed_roles):
     Usage:
         @route('/admin-only')
         @token_required
-        @role_required(['Admin'])
+        @role_required(['admin'])
         def admin_only(current_user):
             ...
     """

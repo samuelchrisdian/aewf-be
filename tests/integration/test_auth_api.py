@@ -23,7 +23,7 @@ class TestAuthAPI:
                 mock_user = MagicMock()
                 mock_user.id = 1
                 mock_user.username = 'admin'
-                mock_user.role = 'Admin'
+                mock_user.role = 'admin'
                 mock_user.is_active = True
                 mock_user_cls.query.filter_by.return_value.first.return_value = mock_user
                 yield

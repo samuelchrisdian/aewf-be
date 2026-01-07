@@ -209,7 +209,7 @@ def get_batch(current_user, batch_id):
 
 @api_v1.route("/import/batches/<int:batch_id>", methods=["DELETE"])
 @token_required
-@role_required(["Admin"])
+@role_required(["admin"])
 def delete_batch(current_user, batch_id):
     """Delete an import batch and its raw logs. Admin only."""
     success, deleted_count, error = batch_service.delete_batch(batch_id)
@@ -233,7 +233,7 @@ def delete_batch(current_user, batch_id):
 
 @api_v1.route("/import/batches/<int:batch_id>/rollback", methods=["POST"])
 @token_required
-@role_required(["Admin"])
+@role_required(["admin"])
 def rollback_batch(current_user, batch_id):
     """Rollback an import batch - delete raw logs and mark as rolled back. Admin only."""
     success, deleted_count, error = batch_service.rollback_batch(batch_id)

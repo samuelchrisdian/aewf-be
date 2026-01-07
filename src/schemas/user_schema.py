@@ -17,8 +17,8 @@ class UserCreateSchema(Schema):
     email = fields.Email(required=False, allow_none=True)
     role = fields.Str(
         required=False,
-        validate=validate.OneOf(['Admin', 'Teacher', 'Staff']),
-        load_default='Staff'
+        validate=validate.OneOf(['admin', 'teacher', 'staff']),
+        load_default='staff'
     )
     is_active = fields.Bool(required=False, load_default=True)
 
@@ -32,7 +32,7 @@ class UserUpdateSchema(Schema):
     email = fields.Email(required=False, allow_none=True)
     role = fields.Str(
         required=False,
-        validate=validate.OneOf(['Admin', 'Teacher', 'Staff'])
+        validate=validate.OneOf(['admin', 'teacher', 'staff'])
     )
     is_active = fields.Bool(required=False)
     password = fields.Str(

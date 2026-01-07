@@ -16,9 +16,9 @@ class TeacherFactory(factory.alchemy.SQLAlchemyModelFactory):
     
     teacher_id = factory.Sequence(lambda n: f"T{n:03d}")
     name = factory.Faker("name")
-    role = "Teacher"
+    role = "teacher"
 
 
 class WaliKelasFactory(TeacherFactory):
     """Factory for generating Wali Kelas (homeroom teacher) test data."""
-    role = "Wali Kelas"
+    role = "wali kelas"

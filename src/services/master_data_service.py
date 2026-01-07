@@ -82,7 +82,7 @@ class MasterDataService:
                 teacher = Teacher.query.get(teacher_id)
                 if not teacher:
                     teacher = Teacher(
-                        teacher_id=teacher_id, name=teacher_name, role="Wali Kelas"
+                        teacher_id=teacher_id, name=teacher_name, role="wali kelas"
                     )
                     db.session.add(teacher)
                 else:
@@ -476,7 +476,7 @@ class MasterDataService:
             teacher = Teacher.query.get(teacher_id)
             if not teacher:
                 teacher = Teacher(
-                    teacher_id=teacher_id, name=teacher_name, role="Wali Kelas"
+                    teacher_id=teacher_id, name=teacher_name, role="wali kelas"
                 )
                 db.session.add(teacher)
 

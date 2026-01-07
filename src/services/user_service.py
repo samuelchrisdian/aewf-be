@@ -217,9 +217,9 @@ class UserService:
     def _serialize_user(user):
         """Serialize user with permissions based on role."""
         role_permissions = {
-            'Admin': ['read', 'write', 'delete', 'manage_users'],
-            'Teacher': ['read', 'write'],
-            'Staff': ['read']
+            'admin': ['read', 'write', 'delete', 'manage_users'],
+            'teacher': ['read', 'write'],
+            'staff': ['read']
         }
         
         return {
@@ -231,7 +231,7 @@ class UserService:
             'last_login': user.last_login.isoformat() if user.last_login else None,
             'created_at': user.created_at.isoformat() if user.created_at else None,
             'updated_at': user.updated_at.isoformat() if user.updated_at else None,
-            'permissions': role_permissions.get(user.role, ['read'])
+            'permissions': role_permissions.get(user.role.lower(), ['read'])
         }
 
 

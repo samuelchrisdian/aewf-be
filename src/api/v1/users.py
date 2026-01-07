@@ -29,7 +29,7 @@ def get_client_info():
 
 @users_bp.route('', methods=['GET'])
 @token_required
-@role_required(['Admin'])
+@role_required(['admin'])
 def list_users(current_user):
     """
     List all users with pagination and filtering.
@@ -74,7 +74,7 @@ def list_users(current_user):
 
 @users_bp.route('', methods=['POST'])
 @token_required
-@role_required(['Admin'])
+@role_required(['admin'])
 def create_user(current_user):
     """
     Create a new user.
@@ -122,7 +122,7 @@ def create_user(current_user):
 
 @users_bp.route('/<int:user_id>', methods=['GET'])
 @token_required
-@role_required(['Admin'])
+@role_required(['admin'])
 def get_user(current_user, user_id):
     """
     Get user by ID.
@@ -147,7 +147,7 @@ def get_user(current_user, user_id):
 
 @users_bp.route('/<int:user_id>', methods=['PUT'])
 @token_required
-@role_required(['Admin'])
+@role_required(['admin'])
 def update_user(current_user, user_id):
     """
     Update an existing user.
@@ -201,7 +201,7 @@ def update_user(current_user, user_id):
 
 @users_bp.route('/<int:user_id>', methods=['DELETE'])
 @token_required
-@role_required(['Admin'])
+@role_required(['admin'])
 def delete_user(current_user, user_id):
     """
     Delete a user (soft delete).
@@ -236,7 +236,7 @@ def delete_user(current_user, user_id):
 
 @users_bp.route('/<int:user_id>/activity-log', methods=['GET'])
 @token_required
-@role_required(['Admin'])
+@role_required(['admin'])
 def get_activity_log(current_user, user_id):
     """
     Get activity log for a user.

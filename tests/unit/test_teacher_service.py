@@ -17,7 +17,7 @@ class TestTeacherService:
         mock_teacher = Mock()
         mock_teacher.teacher_id = "T001"
         mock_teacher.name = "Mrs. Sarah"
-        mock_teacher.role = "Wali Kelas"
+        mock_teacher.role = "wali kelas"
         
         mock_query = Mock()
         mock_query.all.return_value = [mock_teacher]
@@ -44,9 +44,9 @@ class TestTeacherService:
         
         service = TeacherService()
         service.repository = mock_teacher_repo
-        service.get_teachers(role_filter="Wali Kelas")
+        service.get_teachers(role_filter="wali kelas")
         
-        mock_teacher_repo.get_all.assert_called_once_with(role_filter="Wali Kelas")
+        mock_teacher_repo.get_all.assert_called_once_with(role_filter="wali kelas")
     
     @patch('src.services.teacher_service.teacher_repository')
     def test_get_teacher_returns_detailed_data(self, mock_teacher_repo):
@@ -57,7 +57,7 @@ class TestTeacherService:
         mock_teacher = Mock()
         mock_teacher.teacher_id = "T001"
         mock_teacher.name = "Mrs. Sarah"
-        mock_teacher.role = "Wali Kelas"
+        mock_teacher.role = "wali kelas"
         
         mock_teacher_repo.get_by_id.return_value = mock_teacher
         mock_teacher_repo.get_classes_with_student_count.return_value = [

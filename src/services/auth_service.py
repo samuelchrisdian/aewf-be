@@ -227,9 +227,9 @@ class AuthService:
         """Serialize user for response."""
         # Define permissions based on role
         role_permissions = {
-            'Admin': ['read', 'write', 'delete', 'manage_users'],
-            'Teacher': ['read', 'write'],
-            'Staff': ['read']
+            'admin': ['read', 'write', 'delete', 'manage_users'],
+            'teacher': ['read', 'write'],
+            'staff': ['read']
         }
         
         return {
@@ -239,7 +239,7 @@ class AuthService:
             'role': user.role,
             'is_active': user.is_active,
             'last_login': user.last_login.isoformat() if user.last_login else None,
-            'permissions': role_permissions.get(user.role, ['read'])
+            'permissions': role_permissions.get(user.role.lower(), ['read'])
         }
 
 

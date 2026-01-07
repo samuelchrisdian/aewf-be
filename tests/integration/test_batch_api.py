@@ -36,13 +36,13 @@ class TestBatchAPI:
                 mock_admin = MagicMock()
                 mock_admin.id = 1
                 mock_admin.username = 'admin'
-                mock_admin.role = 'Admin'
+                mock_admin.role = 'admin'
                 mock_admin.is_active = True
                 
                 mock_staff = MagicMock()
                 mock_staff.id = 2
                 mock_staff.username = 'staff'
-                mock_staff.role = 'Staff'
+                mock_staff.role = 'staff'
                 mock_staff.is_active = True
                 
                 def get_user(id=None):
@@ -155,7 +155,7 @@ class TestBatchAPIResponseFormat:
                 mock_decode.return_value = {'user_id': 1}
                 mock_user = MagicMock()
                 mock_user.id = 1
-                mock_user.role = 'Admin'
+                mock_user.role = 'admin'
                 mock_user.is_active = True
                 mock_user_cls.query.filter_by.return_value.first.return_value = mock_user
                 yield
@@ -179,7 +179,7 @@ class TestBatchAPIResponseFormat:
                 mock_decode.return_value = {'user_id': 2}
                 mock_user = MagicMock()
                 mock_user.id = 2
-                mock_user.role = 'Staff'
+                mock_user.role = 'staff'
                 mock_user.is_active = True
                 mock_user_cls.query.filter_by.return_value.first.return_value = mock_user
                 

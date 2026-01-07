@@ -39,8 +39,8 @@ class TeacherCreateSchema(Schema):
         validate=validate.Length(min=1, max=255)
     )
     role = fields.String(
-        load_default="Teacher",
-        validate=validate.OneOf(["Teacher", "Wali Kelas", "Guru Mapel", "Admin"])
+        load_default="teacher",
+        validate=validate.OneOf(["teacher", "wali kelas", "guru mapel", "admin"])
     )
     phone = fields.String(
         allow_none=True,
