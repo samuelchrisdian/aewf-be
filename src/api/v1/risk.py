@@ -41,8 +41,11 @@ def get_risk_list(current_user):
     """
     level = request.args.get("level")
     class_id = request.args.get("class_id")
-    page = request.args.get("page", 1, type=int)
-    per_page = request.args.get("per_page", 20, type=int)
+    # Default to pending alerts to show only active cases unless specified
+    alert_status = request.args.get("alert_status") or "pending"  # pending|acknowledged|resolved|none
+    # Default without pagination: if not provided, return all
+    page = request.args.get("page", type=int)
+    per_page = request.args.get("per_page", type=int)
 
     # Validate level if provided
     if level and level not in ["high", "medium", "low"]:
@@ -54,16 +57,23 @@ def get_risk_list(current_user):
     students, pagination = risk_service.get_at_risk_students(
         level=level,
         class_id=class_id,
+        alert_status=alert_status,
         page=page,
         per_page=per_page,
         current_user=current_user,
     )
 
-    return paginated_response(
-        data=students,
-        pagination=pagination,
-        message="At-risk students retrieved successfully",
-    )
+    # If per_page not provided, return without pagination
+    if per_page is None:
+        return success_response(
+            data=students, message="At-risk students retrieved successfully"
+        )
+    else:
+        return paginated_response(
+            data=students,
+            pagination=pagination,
+            message="At-risk students retrieved successfully",
+        )
 
 
 @risk_bp.route("/<nis>", methods=["GET"])
@@ -103,7 +113,8 @@ def get_alerts(current_user):
     Returns:
         Paginated list of risk alerts
     """
-    status = request.args.get("status")
+    # Default to pending alerts when status is not specified
+    status = request.args.get("status") or "pending"
     class_id = request.args.get("class_id")
     page = request.args.get("page", 1, type=int)
     per_page = request.args.get("per_page", 20, type=int)

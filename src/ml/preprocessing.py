@@ -280,24 +280,57 @@ def engineer_features_from_df(df: pd.DataFrame) -> pd.DataFrame:
         features["longest_gap_days"] = 0
 
     # ==========================================================================
-    # RATIO CALCULATIONS
+    # RATIO CALCULATIONS (use counts on ACTIVE school days only)
     # ==========================================================================
 
-    features["absent_ratio"] = np.where(
-        features["total_days"] > 0,
-        features["absent_count"] / features["total_days"],
-        0.0,
-    )
+    # Compute per-student status counts restricted to active dates
+    if active_dates:
+        df_active = df[df["date"].isin(pd.to_datetime(active_dates))]
 
-    features["late_ratio"] = np.where(
-        features["total_days"] > 0, features["late_count"] / features["total_days"], 0.0
-    )
+        status_counts_active = (
+            df_active.pivot_table(index="nis", columns="status", aggfunc="size", fill_value=0)
+            .reset_index()
+        )
 
-    features["attendance_ratio"] = np.where(
-        features["total_days"] > 0,
-        features["present_count"] / features["total_days"],
-        0.0,
-    )
+        # Ensure all status columns exist in active subset
+        for status in ["Present", "Absent", "Late", "Sick", "Permission"]:
+            if status not in status_counts_active.columns:
+                status_counts_active[status] = 0
+
+        # Map active counts to features by nis
+        active_map = status_counts_active.set_index("nis")
+
+        # Helper to fetch active count safely
+        def _get_active_count(nis_value: str, col: str) -> int:
+            try:
+                return int(active_map.at[nis_value, col]) if nis_value in active_map.index else 0
+            except Exception:
+                return 0
+
+        features["_present_count_active"] = features["nis"].apply(
+            lambda n: _get_active_count(n, "Present")
+        )
+        features["_absent_count_active"] = features["nis"].apply(
+            lambda n: _get_active_count(n, "Absent")
+        )
+        features["_late_count_active"] = features["nis"].apply(
+            lambda n: _get_active_count(n, "Late")
+        )
+    else:
+        features["_present_count_active"] = 0
+        features["_absent_count_active"] = 0
+        features["_late_count_active"] = 0
+
+    # Use ACTIVE counts over expected_days to avoid ratios > 1
+    denom = features["total_days"].replace(0, np.nan)
+    features["absent_ratio"] = (features["_absent_count_active"] / denom).fillna(0.0)
+    features["late_ratio"] = (features["_late_count_active"] / denom).fillna(0.0)
+    features["attendance_ratio"] = (features["_present_count_active"] / denom).fillna(0.0)
+
+    # Clamp any potential floating errors to [0, 1]
+    features["absent_ratio"] = features["absent_ratio"].clip(lower=0.0, upper=1.0)
+    features["late_ratio"] = features["late_ratio"].clip(lower=0.0, upper=1.0)
+    features["attendance_ratio"] = features["attendance_ratio"].clip(lower=0.0, upper=1.0)
 
     # Calculate trend for last 7 days per student
     features["trend_score"] = _calculate_trend_scores(df)
@@ -309,7 +342,10 @@ def engineer_features_from_df(df: pd.DataFrame) -> pd.DataFrame:
     ).astype(int)
 
     # Drop intermediate columns
-    features = features.drop(columns=["recorded_days"], errors="ignore")
+    features = features.drop(
+        columns=["recorded_days", "_present_count_active", "_absent_count_active", "_late_count_active"],
+        errors="ignore",
+    )
 
     # Fill any remaining NaN values with 0
     features = features.fillna(0)

@@ -197,6 +197,8 @@ class MLService:
                 "trend_score": round(trend_score, 3),
                 "total_days": int(features.get("total_days", 0)),
                 "attendance_ratio": round(features.get("attendance_ratio", 0), 3),
+                "recording_completeness": round(features.get("recording_completeness", 0.0), 3),
+                "longest_gap_days": int(features.get("longest_gap_days", 0)),
             }
 
             # =================================================================
@@ -232,6 +234,13 @@ class MLService:
                 else:
                     explanation_text = f"Siswa terdeteksi berisiko tinggi karena: {'; '.join(rule_reason)}"
 
+                dq = {
+                    "recording_completeness": float(features.get("recording_completeness", 0.0)),
+                    "is_low_quality": float(features.get("recording_completeness", 0.0))
+                    < LOW_COMPLETENESS_THRESHOLD,
+                    "longest_gap_days": int(features.get("longest_gap_days", 0)),
+                }
+
                 return {
                     "nis": nis,
                     "risk_tier": TIER_RED,
@@ -242,14 +251,7 @@ class MLService:
                     "prediction_method": "rule",
                     "rule_reason": "; ".join(rule_reason),
                     "factors": factors,
-                    "data_quality": {
-                        "recording_completeness": factors.get(
-                            "recording_completeness", 1.0
-                        ),
-                        "is_low_quality": factors.get("recording_completeness", 1.0)
-                        < LOW_COMPLETENESS_THRESHOLD,
-                        "longest_gap_days": int(factors.get("longest_gap_days", 0)),
-                    },
+                    "data_quality": dq,
                     "response_time_ms": round(elapsed * 1000, 2),
                 }
 
@@ -268,6 +270,13 @@ class MLService:
                     tier = TIER_GREEN
                     prob = 0.2
 
+                dq = {
+                    "recording_completeness": float(features.get("recording_completeness", 0.0)),
+                    "is_low_quality": float(features.get("recording_completeness", 0.0))
+                    < LOW_COMPLETENESS_THRESHOLD,
+                    "longest_gap_days": int(features.get("longest_gap_days", 0)),
+                }
+
                 return {
                     "nis": nis,
                     "risk_tier": tier,
@@ -278,14 +287,7 @@ class MLService:
                     "prediction_method": "heuristic",
                     "warning": "Model not loaded, using heuristic fallback",
                     "factors": factors,
-                    "data_quality": {
-                        "recording_completeness": factors.get(
-                            "recording_completeness", 1.0
-                        ),
-                        "is_low_quality": factors.get("recording_completeness", 1.0)
-                        < LOW_COMPLETENESS_THRESHOLD,
-                        "longest_gap_days": int(factors.get("longest_gap_days", 0)),
-                    },
+                    "data_quality": dq,
                     "response_time_ms": round(elapsed * 1000, 2),
                 }
 
@@ -325,6 +327,13 @@ class MLService:
                     "Penjelasan tidak tersedia - interpreter belum dimuat."
                 )
 
+            dq = {
+                "recording_completeness": float(features.get("recording_completeness", 0.0)),
+                "is_low_quality": float(features.get("recording_completeness", 0.0))
+                < LOW_COMPLETENESS_THRESHOLD,
+                "longest_gap_days": int(features.get("longest_gap_days", 0)),
+            }
+
             return {
                 "nis": nis,
                 "risk_tier": tier,
@@ -335,14 +344,7 @@ class MLService:
                 "prediction_method": "ml",
                 "model_threshold": threshold,
                 "factors": factors,
-                "data_quality": {
-                    "recording_completeness": factors.get(
-                        "recording_completeness", 1.0
-                    ),
-                    "is_low_quality": factors.get("recording_completeness", 1.0)
-                    < LOW_COMPLETENESS_THRESHOLD,
-                    "longest_gap_days": int(factors.get("longest_gap_days", 0)),
-                },
+                "data_quality": dq,
                 "response_time_ms": round(elapsed * 1000, 2),
             }
 

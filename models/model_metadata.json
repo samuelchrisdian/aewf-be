@@ -1,6 +1,6 @@
 {
   "model_version": "v2",
-  "trained_at": "2026-01-07T16:10:03.495983+00:00",
+  "trained_at": "2026-01-07T16:28:33.074504+00:00",
   "model_type": "LogisticRegression",
   "explainer_type": "DecisionTree",
   "threshold": 0.5,
@@ -22,45 +22,45 @@
   "metrics": {
     "threshold": 0.5,
     "recall": 1.0,
-    "f1": 0.9333333333333333,
-    "precision": 0.875,
+    "f1": 1.0,
+    "precision": 1.0,
     "auc_roc": 1.0
   },
   "feature_importance": [
     {
       "feature": "late_count",
-      "coefficient": 2.153636690131428,
-      "abs_importance": 2.153636690131428
-    },
-    {
-      "feature": "longest_gap_days",
-      "coefficient": -0.21712795171579638,
-      "abs_importance": 0.21712795171579638
+      "coefficient": 2.065295252320312,
+      "abs_importance": 2.065295252320312
     },
     {
       "feature": "recording_completeness",
-      "coefficient": 0.15244230633213676,
-      "abs_importance": 0.15244230633213676
+      "coefficient": 0.07544327564024476,
+      "abs_importance": 0.07544327564024476
     },
     {
       "feature": "late_ratio",
-      "coefficient": 0.13460229313321426,
-      "abs_importance": 0.13460229313321426
+      "coefficient": 0.024542218901412845,
+      "abs_importance": 0.024542218901412845
     },
     {
-      "feature": "present_count",
-      "coefficient": -0.04553702128947104,
-      "abs_importance": 0.04553702128947104
+      "feature": "longest_gap_days",
+      "coefficient": -0.022411709782273102,
+      "abs_importance": 0.022411709782273102
     },
     {
       "feature": "attendance_ratio",
-      "coefficient": -0.00284606383059194,
-      "abs_importance": 0.00284606383059194
+      "coefficient": 0.015138066024172336,
+      "abs_importance": 0.015138066024172336
+    },
+    {
+      "feature": "present_count",
+      "coefficient": 0.009498246103525773,
+      "abs_importance": 0.009498246103525773
     },
     {
       "feature": "total_days",
-      "coefficient": 3.935909719376642e-05,
-      "abs_importance": 3.935909719376642e-05
+      "coefficient": -0.0003849959795427008,
+      "abs_importance": 0.0003849959795427008
     },
     {
       "feature": "absent_count",

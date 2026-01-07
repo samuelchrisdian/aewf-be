@@ -32,8 +32,9 @@ class RiskService:
         self,
         level: Optional[str] = None,
         class_id: Optional[str] = None,
-        page: int = 1,
-        per_page: int = 20,
+        alert_status: Optional[str] = None,
+        page: Optional[int] = None,
+        per_page: Optional[int] = None,
         current_user: Optional[Any] = None,
     ) -> tuple:
         """
@@ -66,18 +67,22 @@ class RiskService:
             level=level,
             class_id=class_id,
             class_ids=class_ids,
+            alert_status=alert_status,
             page=page,
             per_page=per_page,
         )
 
-        import math
-
-        pagination = {
-            "page": page,
-            "per_page": per_page,
-            "total": total,
-            "pages": math.ceil(total / per_page) if per_page > 0 else 0,
-        }
+        # Build pagination only when requested
+        if per_page and per_page > 0:
+            import math
+            pagination = {
+                "page": page or 1,
+                "per_page": per_page,
+                "total": total,
+                "pages": math.ceil(total / per_page),
+            }
+        else:
+            pagination = None
 
         return students, pagination
 
@@ -118,6 +123,7 @@ class RiskService:
             "risk_probability": ml_result.get("risk_probability", 0.0),
             "explanation_text": ml_result.get("explanation_text", ""),
             "factors": ml_result.get("factors", {}),
+            "data_quality": ml_result.get("data_quality", {}),
             "prediction_method": ml_result.get("prediction_method", "unknown"),
             "is_rule_triggered": ml_result.get("is_rule_overridden", False),
             "rule_reason": ml_result.get("rule_reason"),
@@ -311,6 +317,10 @@ class RiskService:
                     "is_rule_triggered": ml_result.get("is_rule_overridden", False),
                     **ml_result.get("factors", {}),
                 }
+
+                # Attach data quality block for auditing
+                if ml_result.get("data_quality") is not None:
+                    factors["data_quality"] = ml_result.get("data_quality")
 
                 if ml_result.get("rule_reason"):
                     factors["rule_reason"] = ml_result.get("rule_reason")

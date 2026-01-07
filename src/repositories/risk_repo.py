@@ -26,8 +26,9 @@ class RiskRepository:
         level: Optional[str] = None,
         class_id: Optional[str] = None,
         class_ids: Optional[List[str]] = None,
-        page: int = 1,
-        per_page: int = 20,
+        alert_status: Optional[str] = None,
+        page: Optional[int] = None,
+        per_page: Optional[int] = None,
     ) -> tuple:
         """
         Get list of at-risk students with their latest risk scores.
@@ -84,15 +85,37 @@ class RiskRepository:
                     return [], 0
                 query = query.filter(Student.class_id.in_(class_ids))
 
+            # Alert status filter (optional)
+            if alert_status:
+                status_norm = alert_status.strip().lower()
+                # EXISTS subquery to avoid duplicates
+                exists_query = (
+                    session.query(RiskAlert.id)
+                    .filter(RiskAlert.student_nis == RiskHistory.student_nis)
+                )
+
+                if status_norm == "none":
+                    # Students without any alert
+                    query = query.filter(~exists_query.exists())
+                elif status_norm in ["pending", "acknowledged", "resolved"]:
+                    query = query.filter(
+                        exists_query.filter(func.lower(RiskAlert.status) == status_norm).exists()
+                    )
+
             # Order by risk score descending
             query = query.order_by(desc(RiskHistory.risk_score))
 
             # Get total count
             total = query.count()
 
-            # Paginate
-            offset = (page - 1) * per_page
-            results = query.offset(offset).limit(per_page).all()
+            # Paginate only if per_page is provided and > 0
+            if per_page and per_page > 0:
+                p = page or 1
+                offset = (p - 1) * per_page
+                results = query.offset(offset).limit(per_page).all()
+            else:
+                # No pagination: return all results
+                results = query.all()
 
             # Format results
             students = []
@@ -217,9 +240,13 @@ class RiskRepository:
                 .outerjoin(Teacher, RiskAlert.assigned_to == Teacher.teacher_id)
             )
 
-            # Apply filters
+            # Normalize and apply status filter (case-insensitive)
             if status:
-                query = query.filter(RiskAlert.status == status)
+                status_norm = status.strip().lower()
+                query = query.filter(func.lower(RiskAlert.status) == status_norm)
+            else:
+                # Default to pending alerts if no status provided
+                query = query.filter(func.lower(RiskAlert.status) == "pending")
             if class_id:
                 query = query.filter(Student.class_id == class_id)
 
@@ -310,13 +337,18 @@ class RiskRepository:
             if not alert:
                 return False
 
+            # Normalize status and update fields
+            status_norm = (status or "acknowledged").strip().lower()
             alert.action_taken = action
             alert.action_notes = notes
             alert.follow_up_date = follow_up_date
-            alert.status = status
+            alert.status = status_norm
 
-            if status == "resolved":
+            if status_norm == "resolved":
                 alert.resolved_at = datetime.utcnow()
+            else:
+                # Clear resolved_at if moving out of resolved state
+                alert.resolved_at = None
 
             session.commit()
             return True
