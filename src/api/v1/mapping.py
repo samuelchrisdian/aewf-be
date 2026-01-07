@@ -60,6 +60,47 @@ def get_unmapped_users(current_user):
     )
 
 
+@mapping_bp.route("/unmapped-students", methods=["GET"])
+@token_required
+def get_unmapped_students(current_user):
+    """
+    Get list of students without mappings to any machine user.
+
+    Query Parameters:
+        - page: Page number (default: 1)
+        - per_page: Items per page (default: 20, max: 100)
+        - class_id: Filter by class ID
+        - search: Search by name/NIS
+        - is_active: Filter by active status (default: true)
+
+    Returns:
+        Paginated list of unmapped students
+    """
+    # Get pagination params
+    page, per_page, _ = get_pagination_params(request.args)
+
+    # Filters
+    class_id = request.args.get("class_id")
+    search = request.args.get("search")
+    is_active = validate_boolean_param(request.args.get("is_active", "true"))
+    if is_active is None:
+        is_active = True
+
+    result = mapping_service.get_unmapped_students(
+        page=page,
+        per_page=per_page,
+        class_id=class_id,
+        is_active=is_active,
+        search=search,
+    )
+
+    return paginated_response(
+        data=result["data"],
+        pagination=result["pagination"],
+        message="Unmapped students retrieved successfully",
+    )
+
+
 @mapping_bp.route("/bulk-verify", methods=["POST"])
 @token_required
 def bulk_verify_mappings(current_user):

@@ -71,6 +71,47 @@ class MappingRepository:
 
         return query.order_by(MachineUser.machine_user_name.asc())
 
+    def get_unmapped_students(
+        self,
+        class_id: Optional[str] = None,
+        is_active: Optional[bool] = True,
+        search: Optional[str] = None,
+    ):
+        """
+        Get students that don't have any mapping to a machine user.
+
+        Args:
+            class_id: Optional filter by class ID
+            is_active: Optional filter by active status (default True)
+            search: Optional search by student name/NIS
+
+        Returns:
+            SQLAlchemy query for unmapped Students
+        """
+        from sqlalchemy import or_
+
+        # Subquery for mapped student NIS
+        mapped_student_nis = db.session.query(
+            StudentMachineMap.student_nis
+        ).subquery()
+
+        # Base query: students whose NIS not in mapped list
+        query = db.session.query(Student).filter(Student.nis.notin_(mapped_student_nis))
+
+        if class_id:
+            query = query.filter(Student.class_id == class_id)
+
+        if is_active is not None:
+            query = query.filter(Student.is_active == is_active)
+
+        if search:
+            search_pattern = f"%{search}%"
+            query = query.filter(
+                or_(Student.name.ilike(search_pattern), Student.nis.ilike(search_pattern))
+            )
+
+        return query.order_by(Student.name.asc())
+
     def get_stats(self) -> dict:
         """
         Get mapping statistics.

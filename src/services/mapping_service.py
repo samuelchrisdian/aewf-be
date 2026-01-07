@@ -133,6 +133,48 @@ class MappingService:
         result["data"] = users_data
         return result
 
+    def get_unmapped_students(
+        self,
+        page: int = 1,
+        per_page: int = 20,
+        class_id: Optional[str] = None,
+        is_active: Optional[bool] = True,
+        search: Optional[str] = None,
+    ) -> dict:
+        """
+        Get paginated list of students that do not have any mapping to a machine user.
+
+        Args:
+            page: Page number
+            per_page: Items per page
+            class_id: Filter by class ID
+            is_active: Filter by active status (default True)
+            search: Search by name/NIS
+
+        Returns:
+            dict: Paginated unmapped students
+        """
+        query = self.repository.get_unmapped_students(
+            class_id=class_id, is_active=is_active, search=search
+        )
+        result = paginate_query(query, page, per_page)
+
+        students_data = []
+        for student in result["data"]:
+            students_data.append(
+                {
+                    "nis": student.nis,
+                    "name": student.name,
+                    "class_id": student.class_id,
+                    "class_name": student.student_class.class_name if getattr(student, "student_class", None) else None,
+                    "parent_phone": student.parent_phone,
+                    "is_active": student.is_active,
+                }
+            )
+
+        result["data"] = students_data
+        return result
+
     def get_mapping_stats(self) -> dict:
         """
         Get mapping statistics.

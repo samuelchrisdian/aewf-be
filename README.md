@@ -345,6 +345,7 @@ All endpoints are prefixed with `/api/v1` and require authentication token (Head
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `GET` | `/mapping/unmapped` | List unmapped machine users. Query: `?page=1&per_page=20&machine_id=&include_suggestions=true\|false` |
+| `GET` | `/mapping/unmapped-students` | List students without any mapping. Query: `?page=1&per_page=20&class_id=&search=&is_active=true\|false` |
 | `GET` | `/mapping/list` | Get all mappings. Query: `?page=1&per_page=20&status=verified\|suggested\|rejected&machine_id=&class_id=&search=` |
 | `POST` | `/mapping/bulk-verify` | Bulk verify/reject mappings. Body: `{"mappings": [{"mapping_id": 1, "status": "verified"}, ...]}` |
 | `GET` | `/mapping/stats` | Get mapping statistics (total, mapped, verified, suggested counts). |
