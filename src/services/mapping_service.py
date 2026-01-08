@@ -166,7 +166,11 @@ class MappingService:
                     "nis": student.nis,
                     "name": student.name,
                     "class_id": student.class_id,
-                    "class_name": student.student_class.class_name if getattr(student, "student_class", None) else None,
+                    "class_name": (
+                        student.student_class.class_name
+                        if getattr(student, "student_class", None)
+                        else None
+                    ),
                     "parent_phone": student.parent_phone,
                     "is_active": student.is_active,
                 }
@@ -301,6 +305,181 @@ class MappingService:
 
         self.repository.delete_by_student_nis(student_nis)
         return True, None
+
+    def create_manual_mapping(
+        self,
+        machine_user_id: int,
+        student_nis: str,
+        admin_user_id: int,
+        status: str = "verified",
+    ) -> Tuple[Optional[dict], Optional[dict]]:
+        """
+        Create a single manual mapping.
+
+        Args:
+            machine_user_id: Machine user ID
+            student_nis: Student NIS
+            admin_user_id: ID of admin creating the mapping
+            status: Mapping status (verified/suggested)
+
+        Returns:
+            Tuple of (mapping_data, validation_errors)
+        """
+        errors = {}
+
+        # Check if machine user exists
+        machine_user = (
+            db.session.query(MachineUser)
+            .filter(MachineUser.id == machine_user_id)
+            .first()
+        )
+        if not machine_user:
+            errors["machine_user_id"] = ["Machine user not found"]
+
+        # Check if student exists
+        student = db.session.query(Student).filter(Student.nis == student_nis).first()
+        if not student:
+            errors["student_nis"] = ["Student not found"]
+
+        # Check if machine user is already mapped
+        if machine_user and self.repository.get_by_machine_user_id(machine_user_id):
+            errors["machine_user_id"] = ["Machine user is already mapped to a student"]
+
+        # Check if student is already mapped
+        if student and self.repository.get_by_student_nis(student_nis):
+            errors["student_nis"] = ["Student is already mapped to a machine user"]
+
+        if errors:
+            return None, errors
+
+        # Get admin username
+        admin = User.query.get(admin_user_id)
+        admin_name = admin.username if admin else "Unknown"
+
+        # Create mapping
+        mapping = self.repository.create(
+            machine_user_id_fk=machine_user_id,
+            student_nis=student_nis,
+            status=status,
+            confidence_score=100,  # Manual mapping = 100% confidence
+            verified_by=admin_name if status == "verified" else None,
+        )
+
+        return self._serialize_mapping(mapping), None
+
+    def bulk_create_mappings(
+        self,
+        mappings_data: List[dict],
+        admin_user_id: int,
+    ) -> Tuple[dict, Optional[dict]]:
+        """
+        Create multiple manual mappings at once.
+
+        Args:
+            mappings_data: List of dicts with machine_user_id and student_nis
+            admin_user_id: ID of admin creating the mappings
+
+        Returns:
+            Tuple of (results, validation_errors)
+        """
+        results = {
+            "created": 0,
+            "failed": 0,
+            "errors": [],
+            "mappings": [],
+        }
+
+        # Get admin username
+        admin = User.query.get(admin_user_id)
+        admin_name = admin.username if admin else "Unknown"
+
+        for idx, item in enumerate(mappings_data):
+            machine_user_id = item.get("machine_user_id")
+            student_nis = item.get("student_nis")
+
+            # Validate machine user
+            machine_user = (
+                db.session.query(MachineUser)
+                .filter(MachineUser.id == machine_user_id)
+                .first()
+            )
+            if not machine_user:
+                results["failed"] += 1
+                results["errors"].append(
+                    {
+                        "index": idx,
+                        "machine_user_id": machine_user_id,
+                        "student_nis": student_nis,
+                        "error": "Machine user not found",
+                    }
+                )
+                continue
+
+            # Validate student
+            student = (
+                db.session.query(Student).filter(Student.nis == student_nis).first()
+            )
+            if not student:
+                results["failed"] += 1
+                results["errors"].append(
+                    {
+                        "index": idx,
+                        "machine_user_id": machine_user_id,
+                        "student_nis": student_nis,
+                        "error": "Student not found",
+                    }
+                )
+                continue
+
+            # Check if machine user is already mapped
+            if self.repository.get_by_machine_user_id(machine_user_id):
+                results["failed"] += 1
+                results["errors"].append(
+                    {
+                        "index": idx,
+                        "machine_user_id": machine_user_id,
+                        "student_nis": student_nis,
+                        "error": "Machine user is already mapped",
+                    }
+                )
+                continue
+
+            # Check if student is already mapped
+            if self.repository.get_by_student_nis(student_nis):
+                results["failed"] += 1
+                results["errors"].append(
+                    {
+                        "index": idx,
+                        "machine_user_id": machine_user_id,
+                        "student_nis": student_nis,
+                        "error": "Student is already mapped",
+                    }
+                )
+                continue
+
+            # Create mapping
+            try:
+                mapping = self.repository.create(
+                    machine_user_id_fk=machine_user_id,
+                    student_nis=student_nis,
+                    status="verified",
+                    confidence_score=100,
+                    verified_by=admin_name,
+                )
+                results["created"] += 1
+                results["mappings"].append(self._serialize_mapping(mapping))
+            except Exception as e:
+                results["failed"] += 1
+                results["errors"].append(
+                    {
+                        "index": idx,
+                        "machine_user_id": machine_user_id,
+                        "student_nis": student_nis,
+                        "error": str(e),
+                    }
+                )
+
+        return results, None
 
     def _serialize_unmapped_user(
         self, user: MachineUser, students: List[Student], max_suggestions: int = 3

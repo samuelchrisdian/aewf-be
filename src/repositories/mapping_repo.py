@@ -91,9 +91,7 @@ class MappingRepository:
         from sqlalchemy import or_
 
         # Subquery for mapped student NIS
-        mapped_student_nis = db.session.query(
-            StudentMachineMap.student_nis
-        ).subquery()
+        mapped_student_nis = db.session.query(StudentMachineMap.student_nis).subquery()
 
         # Base query: students whose NIS not in mapped list
         query = db.session.query(Student).filter(Student.nis.notin_(mapped_student_nis))
@@ -107,7 +105,10 @@ class MappingRepository:
         if search:
             search_pattern = f"%{search}%"
             query = query.filter(
-                or_(Student.name.ilike(search_pattern), Student.nis.ilike(search_pattern))
+                or_(
+                    Student.name.ilike(search_pattern),
+                    Student.nis.ilike(search_pattern),
+                )
             )
 
         return query.order_by(Student.name.asc())
@@ -171,6 +172,82 @@ class MappingRepository:
         db.session.delete(mapping)
         db.session.commit()
         return True
+
+    def create(
+        self,
+        machine_user_id_fk: int,
+        student_nis: str,
+        status: str = "verified",
+        confidence_score: int = 100,
+        verified_by: Optional[str] = None,
+    ) -> StudentMachineMap:
+        """
+        Create a new mapping.
+
+        Args:
+            machine_user_id_fk: Machine user ID (foreign key)
+            student_nis: Student NIS
+            status: Mapping status (verified/suggested)
+            confidence_score: Confidence score (0-100)
+            verified_by: Username of the admin who verified
+
+        Returns:
+            Created StudentMachineMap instance
+        """
+        import datetime
+
+        mapping = StudentMachineMap(
+            machine_user_id_fk=machine_user_id_fk,
+            student_nis=student_nis,
+            status=status,
+            confidence_score=confidence_score,
+            verified_by=verified_by,
+            verified_at=datetime.datetime.utcnow() if status == "verified" else None,
+        )
+        db.session.add(mapping)
+        db.session.commit()
+        return mapping
+
+    def get_by_machine_user_id(
+        self, machine_user_id_fk: int
+    ) -> Optional[StudentMachineMap]:
+        """
+        Get mapping by machine user ID.
+
+        Args:
+            machine_user_id_fk: Machine user ID (foreign key)
+
+        Returns:
+            StudentMachineMap or None if not found
+        """
+        return (
+            db.session.query(StudentMachineMap)
+            .filter(StudentMachineMap.machine_user_id_fk == machine_user_id_fk)
+            .first()
+        )
+
+    def exists_mapping(
+        self, machine_user_id_fk: int = None, student_nis: str = None
+    ) -> bool:
+        """
+        Check if a mapping already exists.
+
+        Args:
+            machine_user_id_fk: Machine user ID to check
+            student_nis: Student NIS to check
+
+        Returns:
+            bool: True if mapping exists
+        """
+        if machine_user_id_fk:
+            exists = self.get_by_machine_user_id(machine_user_id_fk) is not None
+            if exists:
+                return True
+        if student_nis:
+            exists = self.get_by_student_nis(student_nis) is not None
+            if exists:
+                return True
+        return False
 
     def bulk_update_status(self, updates: List[dict], admin_username: str) -> dict:
         """

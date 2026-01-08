@@ -7,11 +7,17 @@ from flask import Blueprint, request
 
 from src.app.middleware import token_required
 from src.services.mapping_service import mapping_service
+from src.schemas.mapping_schema import (
+    manual_mapping_create_schema,
+    bulk_mapping_create_schema,
+)
 from src.utils.response_helpers import (
     success_response,
+    created_response,
     paginated_response,
     not_found_response,
     validation_error_response,
+    error_response,
 )
 from src.utils.pagination import get_pagination_params
 from src.utils.validators import validate_boolean_param
@@ -249,3 +255,90 @@ def unmap_student(current_user, student_nis):
         return not_found_response("Student mapping")
 
     return success_response(message="Student unmapped successfully")
+
+
+@mapping_bp.route("/manual", methods=["POST"])
+@token_required
+def create_manual_mapping(current_user):
+    """
+    Create a single manual mapping between a machine user and a student.
+
+    Request Body:
+        {
+            "machine_user_id": 123,
+            "student_nis": "2024001",
+            "status": "verified"  // optional, default: "verified"
+        }
+
+    Returns:
+        Created mapping data
+    """
+    data = request.get_json()
+
+    if not data:
+        return validation_error_response(
+            {"_schema": ["Request body is required"]}, message="Invalid request"
+        )
+
+    # Validate input
+    errors = manual_mapping_create_schema.validate(data)
+    if errors:
+        return validation_error_response(errors)
+
+    validated_data = manual_mapping_create_schema.load(data)
+
+    # Create mapping
+    mapping_data, create_errors = mapping_service.create_manual_mapping(
+        machine_user_id=validated_data["machine_user_id"],
+        student_nis=validated_data["student_nis"],
+        admin_user_id=current_user.id,
+        status=validated_data.get("status", "verified"),
+    )
+
+    if create_errors:
+        return validation_error_response(create_errors)
+
+    return created_response(data=mapping_data, message="Mapping created successfully")
+
+
+@mapping_bp.route("/bulk-create", methods=["POST"])
+@token_required
+def bulk_create_mappings(current_user):
+    """
+    Create multiple manual mappings at once.
+
+    Request Body:
+        {
+            "mappings": [
+                {"machine_user_id": 123, "student_nis": "2024001"},
+                {"machine_user_id": 124, "student_nis": "2024002"}
+            ]
+        }
+
+    Returns:
+        Results with created/failed counts and created mappings
+    """
+    data = request.get_json()
+
+    if not data:
+        return validation_error_response(
+            {"_schema": ["Request body is required"]}, message="Invalid request"
+        )
+
+    # Validate input
+    errors = bulk_mapping_create_schema.validate(data)
+    if errors:
+        return validation_error_response(errors)
+
+    validated_data = bulk_mapping_create_schema.load(data)
+
+    # Create mappings
+    results, create_errors = mapping_service.bulk_create_mappings(
+        mappings_data=validated_data["mappings"],
+        admin_user_id=current_user.id,
+    )
+
+    if create_errors:
+        return validation_error_response(create_errors)
+
+    return success_response(data=results, message="Bulk mapping creation completed")
