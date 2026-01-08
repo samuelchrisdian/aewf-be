@@ -194,10 +194,13 @@ class MLService:
                 "absent_count": int(absent_count),
                 "late_ratio": round(late_ratio, 3),
                 "late_count": int(late_count),
+                "present_count": int(features.get("present_count", 0)),
                 "trend_score": round(trend_score, 3),
                 "total_days": int(features.get("total_days", 0)),
                 "attendance_ratio": round(features.get("attendance_ratio", 0), 3),
-                "recording_completeness": round(features.get("recording_completeness", 0.0), 3),
+                "recording_completeness": round(
+                    features.get("recording_completeness", 0.0), 3
+                ),
                 "longest_gap_days": int(features.get("longest_gap_days", 0)),
             }
 
@@ -235,7 +238,9 @@ class MLService:
                     explanation_text = f"Siswa terdeteksi berisiko tinggi karena: {'; '.join(rule_reason)}"
 
                 dq = {
-                    "recording_completeness": float(features.get("recording_completeness", 0.0)),
+                    "recording_completeness": float(
+                        features.get("recording_completeness", 0.0)
+                    ),
                     "is_low_quality": float(features.get("recording_completeness", 0.0))
                     < LOW_COMPLETENESS_THRESHOLD,
                     "longest_gap_days": int(features.get("longest_gap_days", 0)),
@@ -271,7 +276,9 @@ class MLService:
                     prob = 0.2
 
                 dq = {
-                    "recording_completeness": float(features.get("recording_completeness", 0.0)),
+                    "recording_completeness": float(
+                        features.get("recording_completeness", 0.0)
+                    ),
                     "is_low_quality": float(features.get("recording_completeness", 0.0))
                     < LOW_COMPLETENESS_THRESHOLD,
                     "longest_gap_days": int(features.get("longest_gap_days", 0)),
@@ -328,7 +335,9 @@ class MLService:
                 )
 
             dq = {
-                "recording_completeness": float(features.get("recording_completeness", 0.0)),
+                "recording_completeness": float(
+                    features.get("recording_completeness", 0.0)
+                ),
                 "is_low_quality": float(features.get("recording_completeness", 0.0))
                 < LOW_COMPLETENESS_THRESHOLD,
                 "longest_gap_days": int(features.get("longest_gap_days", 0)),
