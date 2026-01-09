@@ -20,7 +20,6 @@ Technical Success Criteria:
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta, date
-from sqlalchemy.orm import Session
 from typing import List, Dict, Optional, Tuple, Set
 import logging
 
@@ -380,7 +379,10 @@ def engineer_features_from_df(df: pd.DataFrame) -> pd.DataFrame:
     )
 
     # Calculate trend for last 7 days per student
-    features["trend_score"] = _calculate_trend_scores(df)
+    # NOTE: _calculate_trend_scores returns Series indexed by 'nis', but features
+    # DataFrame has default 0..N-1 index. Use .map() to align correctly.
+    trend_series = _calculate_trend_scores(df)  # index = nis
+    features["trend_score"] = features["nis"].map(trend_series).fillna(0.0)
 
     # Rule-based trigger (for hybrid system) - behavioral only
     features["is_rule_triggered"] = (

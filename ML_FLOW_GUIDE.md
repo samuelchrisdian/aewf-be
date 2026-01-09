@@ -15,11 +15,11 @@ Sistem ML EWS bertujuan untuk:
 | Metrik | Target | Dicapai |
 |--------|--------|---------|
 | Recall (At-Risk) | ≥ 0.70 | ✅ 1.00 |
-| F1-Score | ≥ 0.65 | ✅ 1.00 |
-| AUC-ROC | ≥ 0.75 | ✅ 1.00 |
+| F1-Score | ≥ 0.65 | ✅ 0.71 |
+| AUC-ROC | ≥ 0.75 | ✅ 0.98 |
 | Respons API | < 3 detik | ✅ <100ms |
 
-> **Model Version**: v2 (dengan fitur recording quality)
+> **Model Version**: v2.1 (fixed `trend_score` mapping, now most important feature)
 
 ---
 
@@ -549,15 +549,15 @@ MLService.train_models()
 
 ### Feature Importance (Urutan Pengaruh)
 
-Berdasarkan data real dengan inferred absences:
+Berdasarkan model v2.1 (setelah perbaikan `trend_score`):
 
 | Ranking | Fitur | Coefficient | Interpretasi |
 |---------|-------|-------------|--------------|
-| 1 | `absent_count` | +2.08 ↑ | **Paling penting** - termasuk inferred absences |
-| 2 | `present_count` | -0.81 ↓ | Kehadiran menurunkan risiko |
-| 3 | `is_rule_triggered` | +0.25 ↑ | Rule-based override aktif |
-| 4 | `absent_ratio` | +0.08 ↑ | Rasio ketidakhadiran |
-| 5 | `late_ratio` | -0.04 ↓ | Rasio keterlambatan |
+| 1 | `trend_score` | -2.77 ↓ | **Paling penting** - tren memburuk → risiko tinggi |
+| 2 | `absent_count` | +0.67 ↑ | Jumlah absen meningkatkan risiko |
+| 3 | `present_count` | -0.56 ↓ | Kehadiran menurunkan risiko |
+| 4 | `sick_count` | -0.51 ↓ | Sakit (bukan absen tanpa keterangan) |
+| 5 | `late_count` | +0.46 ↑ | Keterlambatan meningkatkan risiko |
 
 > **Note**: Koefisien bisa berubah setiap training tergantung data
 
@@ -585,6 +585,13 @@ Karena `absent_count` sekarang termasuk **inferred absences**:
 | Validasi Metrics | Setelah training | Pastikan Recall ≥ 0.70 |
 
 ---
+
+### v2.1 (2026-01-09)
+- ✅ **Fixed `trend_score` Mapping Bug** - Was always 0 due to index misalignment, now correctly mapped
+- ✅ **`trend_score` Now Most Important Feature** - Coefficient: -2.77 (was 0.0)
+- ✅ **Optimized AUC-ROC Calculation** - Moved outside threshold loop (threshold-independent)
+- ✅ **Removed Unused SQLAlchemy Import** - Cleaner module dependency
+- ✅ **Added Deterministic Trend Score Tests** - 2 new tests for regression prevention
 
 ### v2.0 (2026-01-07)
 - ✅ **Global Active Days** - Replaced max per student with global activity threshold

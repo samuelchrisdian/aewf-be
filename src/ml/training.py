@@ -161,6 +161,12 @@ def train_model_with_threshold_tuning(
     # Get probability predictions
     y_proba = model.predict_proba(X_test)[:, 1]
 
+    # Calculate AUC-ROC once (threshold-independent, uses probabilities not labels)
+    try:
+        auc_roc = roc_auc_score(y_test, y_proba)
+    except ValueError:
+        auc_roc = 0.5  # Default if only one class
+
     # Find optimal threshold
     best_threshold = DEFAULT_THRESHOLD
     best_metrics = None
@@ -169,15 +175,10 @@ def train_model_with_threshold_tuning(
     while current_threshold >= MIN_THRESHOLD:
         y_pred = (y_proba >= current_threshold).astype(int)
 
-        # Calculate metrics
+        # Calculate threshold-dependent metrics
         recall = recall_score(y_test, y_pred, zero_division=0)
         f1 = f1_score(y_test, y_pred, zero_division=0)
         precision = precision_score(y_test, y_pred, zero_division=0)
-
-        try:
-            auc_roc = roc_auc_score(y_test, y_proba)
-        except ValueError:
-            auc_roc = 0.5  # Default if only one class
 
         logger.info(
             f"Threshold {current_threshold:.2f}: Recall={recall:.3f}, F1={f1:.3f}, AUC-ROC={auc_roc:.3f}"
@@ -202,11 +203,7 @@ def train_model_with_threshold_tuning(
         recall = recall_score(y_test, y_pred, zero_division=0)
         f1 = f1_score(y_test, y_pred, zero_division=0)
         precision = precision_score(y_test, y_pred, zero_division=0)
-
-        try:
-            auc_roc = roc_auc_score(y_test, y_proba)
-        except ValueError:
-            auc_roc = 0.5
+        # auc_roc already calculated outside loop
 
         best_threshold = MIN_THRESHOLD
         best_metrics = {

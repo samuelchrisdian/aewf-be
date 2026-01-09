@@ -251,3 +251,106 @@ class TestCalculateRecordingCompleteness:
         """Test that completeness is clamped to 1.0 max."""
         # Edge case: more recorded than expected (shouldn't happen, but guarded)
         assert calculate_recording_completeness(15, 10) == 1.0
+
+
+class TestTrendScoreMapping:
+    """
+    Unit tests for trend_score calculation and mapping.
+
+    These tests verify that trend_score is correctly mapped to each student
+    after fixing the index misalignment bug.
+    """
+
+    def test_trend_score_correctly_mapped_to_nis(self):
+        """
+        Deterministic test: trend_score must correctly map to each student.
+
+        Design:
+        - 10 students with 14 days of data (2 weeks)
+        - S001: All present → trend = 0
+        - S002: Absent in recent week → negative trend
+        - S003: Absent in previous week, present recently → positive trend
+        """
+        students = [f"S{i:03d}" for i in range(1, 11)]
+
+        # 14 weekdays: 2 full weeks (Week 1: Jan 6-10, Week 2: Jan 13-17)
+        week1 = [date(2025, 1, 6 + i) for i in range(5)]  # Previous week
+        week2 = [date(2025, 1, 13 + i) for i in range(5)]  # Recent week
+        all_dates = week1 + week2
+
+        records = []
+
+        for nis in students:
+            for d in all_dates:
+                if nis == "S002":
+                    # S002: Present in week1, Absent in week2 → NEGATIVE trend
+                    status = "Present" if d in week1 else "Absent"
+                elif nis == "S003":
+                    # S003: Absent in week1, Present in week2 → POSITIVE trend
+                    status = "Absent" if d in week1 else "Present"
+                else:
+                    # Others: All present → trend = 0
+                    status = "Present"
+                records.append({"nis": nis, "date": d, "status": status})
+
+        df = pd.DataFrame(records)
+        features = engineer_features_from_df(df)
+
+        # Verify trend_score column exists
+        assert "trend_score" in features.columns
+
+        # Get trend scores mapped by nis
+        trend_map = features.set_index("nis")["trend_score"].to_dict()
+
+        # S001 (all present): trend should be ~0
+        assert (
+            abs(trend_map["S001"]) < 0.1
+        ), f"S001 trend should be ~0, got {trend_map['S001']}"
+
+        # S002 (worsening): trend should be negative
+        assert (
+            trend_map["S002"] < 0
+        ), f"S002 trend should be negative, got {trend_map['S002']}"
+
+        # S003 (improving): trend should be positive
+        assert (
+            trend_map["S003"] > 0
+        ), f"S003 trend should be positive, got {trend_map['S003']}"
+
+    def test_trend_score_has_variation(self):
+        """
+        Verify that trend_score shows variation across students with different patterns.
+
+        This catches the bug where all trend_scores were 0 due to index misalignment.
+        """
+        # Create data where half students are worsening, half improving
+        students = [f"S{i:03d}" for i in range(1, 11)]
+        week1 = [date(2025, 1, 6 + i) for i in range(5)]
+        week2 = [date(2025, 1, 13 + i) for i in range(5)]
+        all_dates = week1 + week2
+
+        records = []
+        for i, nis in enumerate(students):
+            for d in all_dates:
+                if i < 5:
+                    # First 5 students: worsening (more absences recently)
+                    status = "Present" if d in week1 else "Absent"
+                else:
+                    # Last 5 students: improving (more present recently)
+                    status = "Absent" if d in week1 else "Present"
+                records.append({"nis": nis, "date": d, "status": status})
+
+        df = pd.DataFrame(records)
+        features = engineer_features_from_df(df)
+
+        # trend_score should NOT be all zeros
+        assert (
+            features["trend_score"].std() > 0
+        ), "trend_score has no variation (all zeros?)"
+
+        # trend_score should have both positive and negative values
+        has_positive = (features["trend_score"] > 0).any()
+        has_negative = (features["trend_score"] < 0).any()
+        assert (
+            has_positive and has_negative
+        ), "trend_score should have both positive and negative values"

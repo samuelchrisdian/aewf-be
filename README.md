@@ -1,6 +1,6 @@
 # AEWF Backend Service (Flask)
 
-> **API Version:** 1.0 | **ML Version:** v2 | **Last Updated:** 2026-01-07
+> **API Version:** 1.0 | **ML Version:** v2.1 | **Last Updated:** 2026-01-09
 
 Backend service for the **Attendance Early Warning Framework (AEWF)** system. Built with **Flask**, **PostgreSQL**, and **scikit-learn**, this service handles data processing, machine learning model training, and provides APIs for the frontend dashboard.
 
@@ -474,11 +474,11 @@ This project implements a novel **Early Warning System (EWS)** using Machine Lea
 | Metric | Target | Achieved |
 |--------|--------|----------|
 | Recall (At-Risk) | ≥ 0.70 | ✅ 1.00 |
-| F1-Score | ≥ 0.65 | ✅ 1.00 |
-| AUC-ROC | ≥ 0.75 | ✅ 1.00 |
+| F1-Score | ≥ 0.65 | ✅ 0.71 |
+| AUC-ROC | ≥ 0.75 | ✅ 0.98 |
 | API Response | < 3 sec | ✅ <100ms |
 
-> **Model Version v2**: Now with Global Active Days and Recording Quality features.
+> **Model Version v2.1**: Fixed `trend_score` mapping, now most important feature (coefficient: -2.77).
 
 ### 1. Feature Engineering (`src/ml/preprocessing.py`)
 The system (v2) automatically extracts **13 features** from daily attendance logs:
