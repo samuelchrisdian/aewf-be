@@ -86,11 +86,12 @@ def calculate_global_active_days(df: pd.DataFrame) -> Tuple[int, List]:
         return 0, []
 
     df = df.copy()
-    df["date"] = pd.to_datetime(df["date"])
+    # Normalize to datetime then extract date for consistent comparison
+    df["date"] = pd.to_datetime(df["date"]).dt.date
 
     # Filter weekends if configured
     if EXCLUDE_WEEKENDS:
-        df = df[df["date"].dt.dayofweek < 5]  # Mon=0, Sun=6
+        df = df[df["date"].apply(lambda d: d.weekday() < 5)]  # Mon=0, Sun=6
 
     if df.empty:
         return 0, []
@@ -104,7 +105,8 @@ def calculate_global_active_days(df: pd.DataFrame) -> Tuple[int, List]:
     for threshold in ACTIVE_DAY_THRESHOLDS:
         min_students = max(MIN_ACTIVE_STUDENTS, int(total_students * threshold))
         active_dates_mask = records_per_date >= min_students
-        active_dates = records_per_date[active_dates_mask].index.tolist()
+        # Return as list of date objects (not Timestamps)
+        active_dates = list(records_per_date[active_dates_mask].index)
 
         if len(active_dates) >= MIN_ACTIVE_DAYS:
             logger.info(
@@ -114,7 +116,7 @@ def calculate_global_active_days(df: pd.DataFrame) -> Tuple[int, List]:
             return len(active_dates), active_dates
 
     # Fallback: use all unique dates (with warning)
-    all_dates = records_per_date.index.tolist()
+    all_dates = list(records_per_date.index)
     logger.warning(
         f"Could not reach {MIN_ACTIVE_DAYS} active days with any threshold. "
         f"Using all {len(all_dates)} unique dates."
@@ -204,13 +206,12 @@ def engineer_features_from_df(df: pd.DataFrame) -> pd.DataFrame:
         logger.warning("Empty DataFrame provided for feature engineering")
         return pd.DataFrame(columns=["nis"] + FEATURE_COLUMNS)
 
-    # Ensure date column is datetime
+    # Normalize date column to date objects (single source of truth)
+    df = df.copy()
     if "date" in df.columns:
-        df = df.copy()
-        df["date"] = pd.to_datetime(df["date"])
+        df["date"] = pd.to_datetime(df["date"]).dt.date
 
     # Normalize status to title case
-    df = df.copy()
     df["status"] = df["status"].str.strip().str.title()
 
     # Status columns we expect
@@ -251,13 +252,17 @@ def engineer_features_from_df(df: pd.DataFrame) -> pd.DataFrame:
     # ==========================================================================
     expected_days, active_dates = calculate_global_active_days(df)
 
-    features["total_days"] = expected_days
+    # Ensure total_days is exactly len(active_dates) for consistency
+    features["total_days"] = len(active_dates)
 
-    logger.info(
-        f"Expected school days: {expected_days}, "
-        f"Date range: {min(active_dates).strftime('%Y-%m-%d') if active_dates else 'N/A'} to "
-        f"{max(active_dates).strftime('%Y-%m-%d') if active_dates else 'N/A'}"
-    )
+    if active_dates:
+        logger.info(
+            f"Expected school days: {len(active_dates)}, "
+            f"Date range: {min(active_dates).strftime('%Y-%m-%d')} to "
+            f"{max(active_dates).strftime('%Y-%m-%d')}"
+        )
+    else:
+        logger.warning("No active dates found - ratios will default to 0.0")
 
     # ==========================================================================
     # RECORDING QUALITY FEATURES (v2)
@@ -284,13 +289,19 @@ def engineer_features_from_df(df: pd.DataFrame) -> pd.DataFrame:
     # ==========================================================================
 
     # Compute per-student status counts restricted to active dates
-    if active_dates:
-        df_active = df[df["date"].isin(pd.to_datetime(active_dates))]
+    # Use set for O(1) lookup - dates are already normalized to date objects
+    active_dates_set = set(active_dates) if active_dates else set()
 
-        status_counts_active = (
-            df_active.pivot_table(index="nis", columns="status", aggfunc="size", fill_value=0)
-            .reset_index()
+    if active_dates_set:
+        # Filter to active domain only
+        df_active = df[df["date"].isin(active_dates_set)]
+        logger.info(
+            f"Active filter: {len(df)} total → {len(df_active)} active-domain records"
         )
+
+        status_counts_active = df_active.pivot_table(
+            index="nis", columns="status", aggfunc="size", fill_value=0
+        ).reset_index()
 
         # Ensure all status columns exist in active subset
         for status in ["Present", "Absent", "Late", "Sick", "Permission"]:
@@ -303,7 +314,11 @@ def engineer_features_from_df(df: pd.DataFrame) -> pd.DataFrame:
         # Helper to fetch active count safely
         def _get_active_count(nis_value: str, col: str) -> int:
             try:
-                return int(active_map.at[nis_value, col]) if nis_value in active_map.index else 0
+                return (
+                    int(active_map.at[nis_value, col])
+                    if nis_value in active_map.index
+                    else 0
+                )
             except Exception:
                 return 0
 
@@ -322,15 +337,47 @@ def engineer_features_from_df(df: pd.DataFrame) -> pd.DataFrame:
         features["_late_count_active"] = 0
 
     # Use ACTIVE counts over expected_days to avoid ratios > 1
-    denom = features["total_days"].replace(0, np.nan)
-    features["absent_ratio"] = (features["_absent_count_active"] / denom).fillna(0.0)
-    features["late_ratio"] = (features["_late_count_active"] / denom).fillna(0.0)
-    features["attendance_ratio"] = (features["_present_count_active"] / denom).fillna(0.0)
+    # Guard division by zero
+    total_days_val = len(active_dates) if active_dates else 0
+    if total_days_val == 0:
+        logger.warning(
+            "Division by zero guard: total_days=0, setting all ratios to 0.0"
+        )
+        features["absent_ratio"] = 0.0
+        features["late_ratio"] = 0.0
+        features["attendance_ratio"] = 0.0
+    else:
+        denom = features["total_days"].replace(0, np.nan)
+        features["absent_ratio"] = (features["_absent_count_active"] / denom).fillna(
+            0.0
+        )
+        features["late_ratio"] = (features["_late_count_active"] / denom).fillna(0.0)
+        features["attendance_ratio"] = (
+            features["_present_count_active"] / denom
+        ).fillna(0.0)
 
-    # Clamp any potential floating errors to [0, 1]
+    # ==========================================================================
+    # INVARIANT CHECK: ratios should not exceed 1.0 (bug detection)
+    # ==========================================================================
+    for col in ["absent_ratio", "late_ratio", "attendance_ratio"]:
+        violations = features[features[col] > 1.0 + 1e-6]
+        if len(violations) > 0:
+            # Log max 10 samples to avoid log explosion
+            sample_violations = violations.head(10)[["nis", col, "total_days"]].to_dict(
+                "records"
+            )
+            max_ratio = violations[col].max()
+            logger.warning(
+                f"INVARIANT VIOLATION: {col} > 1.0 for {len(violations)} students "
+                f"(max={max_ratio:.3f}). Samples: {sample_violations}"
+            )
+
+    # Safety net clip (should not trigger if logic is correct)
     features["absent_ratio"] = features["absent_ratio"].clip(lower=0.0, upper=1.0)
     features["late_ratio"] = features["late_ratio"].clip(lower=0.0, upper=1.0)
-    features["attendance_ratio"] = features["attendance_ratio"].clip(lower=0.0, upper=1.0)
+    features["attendance_ratio"] = features["attendance_ratio"].clip(
+        lower=0.0, upper=1.0
+    )
 
     # Calculate trend for last 7 days per student
     features["trend_score"] = _calculate_trend_scores(df)
@@ -343,7 +390,12 @@ def engineer_features_from_df(df: pd.DataFrame) -> pd.DataFrame:
 
     # Drop intermediate columns
     features = features.drop(
-        columns=["recorded_days", "_present_count_active", "_absent_count_active", "_late_count_active"],
+        columns=[
+            "recorded_days",
+            "_present_count_active",
+            "_absent_count_active",
+            "_late_count_active",
+        ],
         errors="ignore",
     )
 
