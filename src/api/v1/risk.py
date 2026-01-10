@@ -41,8 +41,8 @@ def get_risk_list(current_user):
     """
     level = request.args.get("level")
     class_id = request.args.get("class_id")
-    # Default to pending alerts to show only active cases unless specified
-    alert_status = request.args.get("alert_status") or "pending"  # pending|acknowledged|resolved|none
+    # alert_status filter: pending|acknowledged|resolved|none|all (default: all = no filter)
+    alert_status = request.args.get("alert_status")  # None or "all" = no filter
     # Default without pagination: if not provided, return all
     page = request.args.get("page", type=int)
     per_page = request.args.get("per_page", type=int)

@@ -86,12 +86,12 @@ class RiskRepository:
                 query = query.filter(Student.class_id.in_(class_ids))
 
             # Alert status filter (optional)
-            if alert_status:
+            # Skip filtering if alert_status is None, empty, or "all"
+            if alert_status and alert_status.strip().lower() not in ["", "all"]:
                 status_norm = alert_status.strip().lower()
                 # EXISTS subquery to avoid duplicates
-                exists_query = (
-                    session.query(RiskAlert.id)
-                    .filter(RiskAlert.student_nis == RiskHistory.student_nis)
+                exists_query = session.query(RiskAlert.id).filter(
+                    RiskAlert.student_nis == RiskHistory.student_nis
                 )
 
                 if status_norm == "none":
@@ -99,7 +99,9 @@ class RiskRepository:
                     query = query.filter(~exists_query.exists())
                 elif status_norm in ["pending", "acknowledged", "resolved"]:
                     query = query.filter(
-                        exists_query.filter(func.lower(RiskAlert.status) == status_norm).exists()
+                        exists_query.filter(
+                            func.lower(RiskAlert.status) == status_norm
+                        ).exists()
                     )
 
             # Order by risk score descending
@@ -237,7 +239,7 @@ class RiskRepository:
             ).join(Student, RiskAlert.student_nis == Student.nis)
 
             # Default to pending if no status provided
-            status_norm = (status.strip().lower() if status else "pending")
+            status_norm = status.strip().lower() if status else "pending"
 
             # Subquery: latest alert per student OVERALL, then filter by requested status
             latest_overall = (
