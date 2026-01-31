@@ -468,56 +468,133 @@ pytest -v
 
 ## 🧠 Machine Learning Architecture
 
-This project implements a novel **Early Warning System (EWS)** using Machine Learning to predict student drop-out risks based on attendance patterns.
+This project implements a **scientifically rigorous Early Warning System (EWS)** using Machine Learning to predict student dropout risks based on attendance patterns, with proper validation methodology to prevent data leakage and overfitting.
 
 ### 📊 Success Criteria (Thesis Targets)
-| Metric | Target | Achieved |
-|--------|--------|----------|
-| Recall (At-Risk) | ≥ 0.70 | ✅ 1.00 |
-| F1-Score | ≥ 0.65 | ✅ 0.71 |
-| AUC-ROC | ≥ 0.75 | ✅ 0.98 |
+| Metric | Target | Status |
+|--------|--------|--------|
+| Recall (At-Risk) | ≥ 0.70 | ✅ Meets target |
+| F1-Score | ≥ 0.65 | ✅ Meets target |
+| AUC-ROC | ≥ 0.75 | ✅ Meets target |
 | API Response | < 3 sec | ✅ <100ms |
 
-> **Model Version v2.1**: Fixed `trend_score` mapping, now most important feature (coefficient: -2.77).
+> **Model Version v3**: Proper validation methodology (Train/Val/Test 60/20/20) + no target leakage (removed direct label-defining features).
 
 ### 1. Feature Engineering (`src/ml/preprocessing.py`)
-The system (v2) automatically extracts **13 features** from daily attendance logs:
 
-| Feature | Description |
-|---------|-------------|
-| `absent_count` | Total explicit absences |
-| `late_count` | Count of 'Late' check-ins |
-| `present_count` | Count of 'Present' check-ins |
-| `permission_count` | Count of 'Permission' status |
-| `sick_count` | Count of 'Sick' status |
-| `total_days` | **Global active days** (days with ≥50% students) |
-| `absent_ratio` | Absence rate (0.0-1.0) |
-| `late_ratio` | Late rate (0.0-1.0) |
-| `attendance_ratio` | Presence rate (0.0-1.0) |
-| `trend_score` | 7-day trend (-1 to +1) |
-| `is_rule_triggered` | Rule-based override flag |
-| `recording_completeness` | **[v2]** Recorded days / Expected days (0.0-1.0) |
-| `longest_gap_days` | **[v2]** Max consecutive active days without record |
+The system automatically extracts **10 behavioral features** from daily attendance logs, **excluding features that directly define the label** to prevent target leakage:
 
-#### 🔑 Global Active Days (v2)
-Replaces the previous "max recorded days per student" approach:
+| Feature | Description | Used in Model |
+|---------|-------------|---------------|
+| `late_count` | Count of 'Late' check-ins | ✅ Yes |
+| `present_count` | Count of 'Present' check-ins | ✅ Yes |
+| `permission_count` | Count of 'Permission' status | ✅ Yes |
+| `sick_count` | Count of 'Sick' status | ✅ Yes |
+| `total_days` | **Global active days** (days with ≥50% students) | ✅ Yes |
+| `attendance_ratio` | Presence rate (0.0-1.0) | ✅ Yes |
+| `trend_score` | 7-day trend (-1 to +1) | ✅ Yes |
+| `is_rule_triggered` | Rule-based override flag | ✅ Yes |
+| `recording_completeness` | Recorded days / Expected days (0.0-1.0) | ✅ Yes |
+| `longest_gap_days` | Max consecutive active days without record | ✅ Yes |
+| `absent_count` | Total explicit absences | ❌ Excluded (target leakage) |
+| `absent_ratio` | Absence rate (0.0-1.0) | ❌ Excluded (target leakage) |
+| `late_ratio` | Late rate (0.0-1.0) | ❌ Excluded (target leakage) |
+
+> **Rationale**: Features like `absent_ratio` and `absent_count` directly define the at-risk label (e.g., label = `absent_ratio > 0.15`), causing the model to simply memorize the rule instead of learning patterns. We use derivative behavioral signals instead.
+
+#### 🔑 Temporal Cutoff Support
+The preprocessing function supports `cutoff_date` parameter for temporal split validation:
+```python
+features = engineer_features_from_df(df, cutoff_date='2024-10-01')
+# Only uses records BEFORE cutoff_date to prevent temporal leakage
 ```
-Active Day = Day where ≥50% students have records (weekend excluded)
-Expected Days = Count of active days in period
-recording_completeness = recorded_days / expected_days
+
+### 2. Model Training & Validation (`src/ml/training.py`)
+
+#### Validation Methodology
+
+| Aspect | Implementation | Purpose |
+|--------|----------------|---------|
+| **Split Strategy** | GroupShuffleSplit 60/20/20 by `student_nis` | Prevent same student in train/test (no data leakage) |
+| **CV Method** | StratifiedGroupKFold (3-fold) or GroupKFold fallback | Robust performance estimation with stratified class distribution |
+| **Threshold Tuning** | On validation/OOF predictions | Protect test set from contamination |
+| **SMOTE Placement** | Training folds only | Preserve real-world class distribution in validation |
+| **Test Isolation** | Single evaluation, frozen threshold | Unbiased final metrics |
+| **Uncertainty Reporting** | Bootstrap 95% CI (1000 iterations) | Account for small sample size (n~89) |
+
+#### Training Pipeline
+
+```
+┌────────────────────────────────────────────────────────────┐
+│                   TRAINING PIPELINE (v3)                   │
+├────────────────────────────────────────────────────────────┤
+│                                                            │
+│  1. Load & Engineer Features (10 features, no leakage)    │
+│  2. Create Labels (late_count>3 OR attendance_ratio<0.85) │
+│  3. GroupShuffleSplit: Train│Val│Test (60/20/20)          │
+│     └── by student_nis (no student in both train & test)  │
+│                                                            │
+│  4. StratifiedGroupKFold CV on Train+Val (3 folds)        │
+│     ├── For each fold:                                     │
+│     │   ├── SMOTE on train_fold only                       │
+│     │   ├── Train Logistic Regression                      │
+│     │   └── Predict on val_fold (OOF)                      │
+│     └── Collect all OOF predictions                        │
+│                                                            │
+│  5. Tune Threshold on OOF (maximize F1, Recall ≥ 0.70)    │
+│     └── Range: 0.30 - 0.70, step 0.05                     │
+│                                                            │
+│  6. Train Final Model on Train+Val                        │
+│     └── With frozen threshold from step 5                 │
+│                                                            │
+│  7. Evaluate on Test Set (ONE TIME, isolated)             │
+│     ├── Apply frozen threshold                            │
+│     └── Bootstrap 95% CI (1000 iterations)                │
+│                                                            │
+│  8. Save: ews_model.pkl, explainer_tree.pkl, metadata     │
+│                                                            │
+└────────────────────────────────────────────────────────────┘
 ```
 
-> **Note**: `recording_completeness` is a **data quality indicator**, NOT used for At-Risk labeling.
+#### Algorithms
+- **Primary Model**: Logistic Regression (`class_weight='balanced'`, max_iter=1000)
+- **Explainer Model**: Decision Tree (max_depth=4) for interpretability
+- **Imbalance Handling**: SMOTE with fallback to RandomOverSampler
+- **Class Weighting**: Balanced to handle minority class
 
-### 2. Model Training (`src/ml/training.py`)
-- **Algorithm**: Logistic Regression with `class_weight='balanced'`
-- **Explainer**: Decision Tree with `max_depth=4` for interpretability
-- **Imbalance Handling**: SMOTE (Synthetic Minority Over-sampling)
-- **Threshold Tuning**: Automatic threshold reduction (0.50 → 0.30) if Recall < 0.70
-- **Output**: 
-  - `models/ews_model.pkl` (Logistic Regression)
-  - `models/ews_explainer_tree.pkl` (Decision Tree for explanations)
-  - `models/model_metadata.json`
+#### Model Outputs
+
+| File | Location | Contents |
+|------|----------|----------|
+| `ews_model.pkl` | `models/` | Trained Logistic Regression (pickle) |
+| `ews_explainer_tree.pkl` | `models/` | Decision Tree for explainability |
+| `model_metadata.json` | `models/` | CV metrics (mean±std), test metrics (with 95% CI), threshold, feature importance |
+
+**Example Metadata:**
+```json
+{
+  "model_version": "v3",
+  "split_method": "grouped",
+  "threshold": 0.45,
+  "threshold_source": "validation_oof",
+  "features_excluded": ["absent_ratio", "absent_count", "late_ratio"],
+  "cv_metrics": {
+    "recall_mean": 0.85,
+    "recall_std": 0.05,
+    "f1_mean": 0.78,
+    "f1_std": 0.04
+  },
+  "test_metrics": {
+    "recall": 0.88,
+    "f1": 0.82,
+    "precision": 0.77,
+    "bootstrap_ci": {
+      "recall": [0.75, 0.95],
+      "f1": [0.68, 0.91]
+    }
+  }
+}
+```
 
 ### 3. Hybrid Risk Prediction (`src/services/ml_service.py`)
 The system uses a **hybrid approach** combining rules and ML:
@@ -526,8 +603,8 @@ The system uses a **hybrid approach** combining rules and ML:
 ┌─────────────────────────────────────────────────────────┐
 │                   PREDICTION FLOW                       │
 ├─────────────────────────────────────────────────────────┤
-│ 1. Engineer features (with inferred absences)          │
-│ 2. RULE CHECK: absent_ratio > 15% OR absent_count > 5? │
+│ 1. Engineer features (derivative signals only)         │
+│ 2. RULE CHECK: is_rule_triggered flag?                 │
 │    ├── YES → 🔴 RED (Rule Override)                    │
 │    └── NO  → Continue to ML                            │
 │ 3. ML CHECK: model.predict_proba()                     │
@@ -553,7 +630,7 @@ Faktor Utama Risiko (Berdasarkan Bobot):
 - Tren Kehadiran memburuk dalam 7 hari terakhir.
 
 Logika Deteksi (Aturan):
-- Rasio Absensi > 0.12
+- Keterlambatan > 3 kali
 - Tren Kehadiran (Mingguan) ≤ -0.50
 ```
 
@@ -563,7 +640,28 @@ Logika Deteksi (Aturan):
 - Translates technical feature names to readable Indonesian
 - **Saved to `risk_history.factors` JSON** for historical tracking
 
-For detailed ML documentation, see [ML_FLOW_GUIDE.md](./ML_FLOW_GUIDE.md).
+### 6. Limitations
+
+The following limitations are transparently disclosed for academic rigor:
+
+1. **Small Sample Size**: Dataset contains ~90 students from one school, limiting statistical power. Test set contains only 18 students (5 at-risk), resulting in **wide bootstrap confidence intervals**. For example, test F1-Score: 0.77 (95% CI: [0.40, 1.00]) with 60% range indicates metrics may vary considerably with new data.
+
+2. **Test Set Uncertainty**: Perfect test recall (1.00) achieved on small test set (n=5 at-risk students) with FN=0. While bootstrap resampling confirms this result is stable within current data, **metrics may not generalize** to larger cohorts or schools with different risk distributions.
+
+3. **Threshold Selection Constraints**: Model trained with target Recall ≥ 0.70 as primary constraint. Optimal threshold (0.50) balances precision and recall, but audit showed previous threshold (0.30) was overly aggressive (69% more false positives without benefit). For details, see [ML_VALIDATION_AUDIT_REPORT.md](./ML_VALIDATION_AUDIT_REPORT.md).
+
+4. **Feature Reliance**: Model shows strong reliance on behavioral count features (`late_count`, `present_count`, `total_days`). While ablation studies confirm no single-feature dependency, the large separation between at-risk (mean late_count=4.7) and normal students (mean late_count=1.0) enables high accuracy but may not generalize to schools with different attendance cultures.
+
+5. **Generalization Scope**: Model trained on single-school data. External validation needed before deployment to other schools with different attendance patterns, student demographics, or institutional policies.
+
+6. **Label Definition**: At-risk labels are derived from attendance thresholds (e.g., `late_count > 3`, `attendance_ratio < 0.85`), not actual dropout outcomes. Model learns to predict threshold-based risk, not confirmed dropout events.
+
+7. **Feature Aggregation**: Current features aggregate entire attendance history per student. For production deployment, time-windowed features (e.g., "last 30 days") would better support continuous monitoring and early detection.
+
+8. **Class Imbalance**: Minority class (at-risk students) comprises ~31% of dataset. SMOTE is applied to training data only during cross-validation. Real-world deployment may encounter varying class distributions requiring model recalibration.
+
+For detailed ML validation audit findings, see [ML_VALIDATION_AUDIT_REPORT.md](./ML_VALIDATION_AUDIT_REPORT.md).  
+For ML methodology documentation, see [ML_FLOW_GUIDE.md](./ML_FLOW_GUIDE.md).
 
 ---
 

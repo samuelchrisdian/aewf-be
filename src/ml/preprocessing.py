@@ -44,16 +44,15 @@ EXCLUDE_WEEKENDS = True  # Filter out Sat/Sun from school days
 LOW_COMPLETENESS_THRESHOLD = 0.7  # Below this = low data quality
 
 # Feature columns (must be consistent between training and prediction)
+# NOTE: absent_ratio, absent_count, late_ratio excluded to prevent target leakage
+# (these directly define the at-risk label in training)
 FEATURE_COLUMNS = [
-    # Behavioral features
-    "absent_count",
+    # Behavioral features (derivative signals only)
     "late_count",
     "present_count",
     "permission_count",
     "sick_count",
     "total_days",
-    "absent_ratio",
-    "late_ratio",
     "attendance_ratio",
     "trend_score",
     "is_rule_triggered",
@@ -185,7 +184,9 @@ def calculate_recording_completeness(recorded_days: int, expected_days: int) -> 
 # =============================================================================
 
 
-def engineer_features_from_df(df: pd.DataFrame) -> pd.DataFrame:
+def engineer_features_from_df(
+    df: pd.DataFrame, cutoff_date: Optional[date] = None
+) -> pd.DataFrame:
     """
     Engineer features from a raw attendance DataFrame (v2).
 
@@ -197,6 +198,9 @@ def engineer_features_from_df(df: pd.DataFrame) -> pd.DataFrame:
             - nis: Student identifier
             - date: Attendance date (datetime or date object)
             - status: One of 'Present', 'Absent', 'Late', 'Sick', 'Permission'
+        cutoff_date: Optional cutoff date for temporal split validation.
+                     If provided, only records BEFORE this date are used.
+                     Prevents temporal leakage in time-based train/test splits.
 
     Returns:
         DataFrame with engineered features, indexed by 'nis'
@@ -209,6 +213,15 @@ def engineer_features_from_df(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     if "date" in df.columns:
         df["date"] = pd.to_datetime(df["date"]).dt.date
+
+    # Apply cutoff date filter for temporal split validation
+    if cutoff_date is not None:
+        if isinstance(cutoff_date, str):
+            cutoff_date = pd.to_datetime(cutoff_date).date()
+        df = df[df["date"] < cutoff_date]
+        logger.info(
+            f"Applied temporal cutoff: using {len(df)} records before {cutoff_date}"
+        )
 
     # Normalize status to title case
     df["status"] = df["status"].str.strip().str.title()

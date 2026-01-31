@@ -1,107 +1,79 @@
 {
-  "model_version": "v2",
-  "trained_at": "2026-01-10T02:04:02.053840+00:00",
+  "model_version": "v3",
   "model_type": "LogisticRegression",
-  "explainer_type": "DecisionTree",
-  "threshold": 0.5,
-  "feature_columns": [
-    "absent_count",
+  "trained_at": "2026-01-24T15:41:44.482940+00:00",
+  "split_method": "grouped",
+  "threshold": 0.4,
+  "threshold_source": "validation_oof",
+  "features": [
     "late_count",
     "present_count",
     "permission_count",
     "sick_count",
     "total_days",
-    "absent_ratio",
-    "late_ratio",
     "attendance_ratio",
     "trend_score",
     "is_rule_triggered",
     "recording_completeness",
     "longest_gap_days"
   ],
-  "metrics": {
-    "threshold": 0.5,
-    "recall": 1.0,
-    "f1": 0.9090909090909091,
-    "precision": 0.8333333333333334,
-    "auc_roc": 0.9692307692307692
-  },
-  "feature_importance": [
-    {
-      "feature": "late_count",
-      "coefficient": 2.209879341420389,
-      "abs_importance": 2.209879341420389
-    },
-    {
-      "feature": "permission_count",
-      "coefficient": -0.529419777366193,
-      "abs_importance": 0.529419777366193
-    },
-    {
-      "feature": "sick_count",
-      "coefficient": -0.36924488053122073,
-      "abs_importance": 0.36924488053122073
-    },
-    {
-      "feature": "present_count",
-      "coefficient": -0.264255243827214,
-      "abs_importance": 0.264255243827214
-    },
-    {
-      "feature": "total_days",
-      "coefficient": 0.17338924468229905,
-      "abs_importance": 0.17338924468229905
-    },
-    {
-      "feature": "trend_score",
-      "coefficient": -0.06157495452752079,
-      "abs_importance": 0.06157495452752079
-    },
-    {
-      "feature": "late_ratio",
-      "coefficient": 0.025940351035398726,
-      "abs_importance": 0.025940351035398726
-    },
-    {
-      "feature": "attendance_ratio",
-      "coefficient": -0.013483090145116318,
-      "abs_importance": 0.013483090145116318
-    },
-    {
-      "feature": "longest_gap_days",
-      "coefficient": 0.005274690762173243,
-      "abs_importance": 0.005274690762173243
-    },
-    {
-      "feature": "recording_completeness",
-      "coefficient": 0.001884735503257636,
-      "abs_importance": 0.001884735503257636
-    },
-    {
-      "feature": "absent_count",
-      "coefficient": 0.0,
-      "abs_importance": 0.0
-    },
-    {
-      "feature": "absent_ratio",
-      "coefficient": 0.0,
-      "abs_importance": 0.0
-    },
-    {
-      "feature": "is_rule_triggered",
-      "coefficient": 0.0,
-      "abs_importance": 0.0
-    }
+  "features_excluded": [
+    "absent_ratio",
+    "absent_count",
+    "late_ratio"
   ],
-  "explainer_config": {
-    "max_depth": 4,
-    "min_samples_leaf": 5
+  "feature_importance": {
+    "late_count": 1.942260094610167,
+    "present_count": -0.601088250718632,
+    "permission_count": -0.3748521875973822,
+    "sick_count": -0.3200295057876082,
+    "total_days": 0.5053010442149941,
+    "attendance_ratio": -0.009598720021287,
+    "trend_score": -0.07091597605994253,
+    "is_rule_triggered": 0.0,
+    "recording_completeness": 0.005921628938252427,
+    "longest_gap_days": -0.0026211790985650727
   },
-  "config": {
-    "target_recall": 0.7,
-    "target_f1": 0.65,
-    "target_auc_roc": 0.75,
-    "class_weight": "balanced",
-    "smote_applied": true
+  "cv_metrics": {
+    "recall_mean": 1.0,
+    "recall_std": 0.0,
+    "f1_mean": 0.9841269841269842,
+    "f1_std": 0.022447834323382487,
+    "precision_mean": 0.9696969696969697,
+    "precision_std": 0.04285495643554835
+  },
+  "test_metrics": {
+    "recall": 1.0,
+    "f1": 0.8333333333333334,
+    "precision": 0.7142857142857143,
+    "auc_roc": 1.0,
+    "confusion_matrix": {
+      "tn": 11,
+      "fp": 2,
+      "fn": 0,
+      "tp": 5
+    },
+    "test_size": 18,
+    "bootstrap_ci": {
+      "recall": [
+        1.0,
+        1.0
+      ],
+      "f1": [
+        0.5,
+        1.0
+      ],
+      "precision": [
+        0.3333333333333333,
+        1.0
+      ]
+    }
+  },
+  "validation_config": {
+    "train_size": 0.6,
+    "val_size": 0.2,
+    "test_size": 0.2,
+    "cv_n_splits": 3,
+    "bootstrap_iterations": 1000
   }
 }

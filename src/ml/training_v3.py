@@ -50,6 +50,7 @@ except ImportError:
 from src.ml.preprocessing import (
     engineer_features,
     engineer_features_from_df,
+    get_feature_columns,
     prepare_features_for_model,
     get_data_quality_flags,
     FEATURE_COLUMNS,
@@ -328,24 +329,20 @@ def tune_threshold_on_validation(
     y_true: np.ndarray,
     y_proba: np.ndarray,
     target_recall: float = TARGET_RECALL,
-    min_threshold: float = 0.40,  # Increased from 0.30 to avoid overly aggressive thresholds
+    min_threshold: float = 0.30,
     max_threshold: float = 0.70,
     step: float = 0.05,
 ) -> Tuple[float, Dict]:
     """
     Find optimal threshold by maximizing F1 while maintaining Recall >= target.
-    
-    Updated (2024-01-24): Increased min_threshold from 0.30 to 0.40 based on audit findings.
-    Threshold=0.30 was too aggressive (high FP rate) without benefit since threshold=0.50
-    already achieves Recall >= 0.70 target with better precision and F1-score.
 
     Args:
         y_true: True labels
         y_proba: Predicted probabilities
-        target_recall: Minimum required recall (default: 0.70)
-        min_threshold: Minimum threshold to try (default: 0.40)
-        max_threshold: Maximum threshold to try (default: 0.70)
-        step: Step size for threshold search (default: 0.05)
+        target_recall: Minimum required recall
+        min_threshold: Minimum threshold to try
+        max_threshold: Maximum threshold to try
+        step: Step size for threshold search
 
     Returns:
         Tuple of (optimal_threshold, metrics_at_threshold)
@@ -759,8 +756,7 @@ def train_and_save_models(
         groups = features_df["nis"]
 
         # Prepare features (drop nis, select only FEATURE_COLUMNS)
-        X = prepare_features_for_model(features_df)
-        selected_features = FEATURE_COLUMNS  # Use the imported constant
+        X, selected_features = prepare_features_for_model(features_df)
 
         logger.info(f"\nDataset: {len(X)} students")
         logger.info(f"Class distribution: {Counter(y)}")

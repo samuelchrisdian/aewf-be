@@ -135,7 +135,7 @@ class MLService:
         Triggers the training pipeline.
 
         Returns:
-            Dictionary with training results
+            Dictionary with training results (compatible with old API format)
         """
         try:
             # Unload existing model so we reload the new one
@@ -143,16 +143,55 @@ class MLService:
 
             result = train_models()
 
+            if result.get("status") == "error":
+                return {
+                    "status": "error",
+                    "message": result.get("message", "Training failed"),
+                    "metrics": None,
+                    "threshold": None,
+                    "all_criteria_met": False,
+                }
+
+            # Extract metrics from new format (v3)
+            cv_metrics = result.get("cv_metrics", {})
+            test_metrics = result.get("test_metrics", {})
+            
+            # Build backward-compatible metrics dict
+            metrics = {
+                "cv_recall": f"{cv_metrics.get('recall_mean', 0):.3f} ± {cv_metrics.get('recall_std', 0):.3f}",
+                "cv_f1": f"{cv_metrics.get('f1_mean', 0):.3f} ± {cv_metrics.get('f1_std', 0):.3f}",
+                "cv_precision": f"{cv_metrics.get('precision_mean', 0):.3f} ± {cv_metrics.get('precision_std', 0):.3f}",
+                "test_recall": test_metrics.get("recall", 0),
+                "test_f1": test_metrics.get("f1", 0),
+                "test_precision": test_metrics.get("precision", 0),
+                "test_auc_roc": test_metrics.get("auc_roc", 0),
+                "bootstrap_ci": test_metrics.get("bootstrap_ci", {}),
+            }
+
+            # Check if criteria met (based on test metrics)
+            all_criteria_met = (
+                test_metrics.get("recall", 0) >= 0.70
+                and test_metrics.get("f1", 0) >= 0.65
+                and test_metrics.get("auc_roc", 0) >= 0.75
+            )
+
             return {
-                "status": result.get("status", "error"),
-                "message": result.get("message", "Unknown"),
-                "metrics": result.get("metrics"),
+                "status": "success",
+                "message": result.get("message", "Models trained successfully"),
+                "metrics": metrics,
                 "threshold": result.get("threshold"),
-                "all_criteria_met": result.get("all_criteria_met", False),
+                "all_criteria_met": all_criteria_met,
+                "model_version": result.get("model_version", "v3"),
             }
         except Exception as e:
-            logger.error(f"Training failed: {e}")
-            return {"status": "error", "message": str(e)}
+            logger.error(f"Training failed: {e}", exc_info=True)
+            return {
+                "status": "error",
+                "message": str(e),
+                "metrics": None,
+                "threshold": None,
+                "all_criteria_met": False,
+            }
 
     @staticmethod
     def predict_risk(nis: str) -> Dict:
